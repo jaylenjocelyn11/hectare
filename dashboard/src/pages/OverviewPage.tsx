@@ -82,6 +82,12 @@ export function OverviewPage() {
     })
     .slice(0, 8);
 
+  const dateLabel = today.toLocaleDateString("fr-CA", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+
   return (
     <>
       {resolving ? <p className="muted">Recherche de ton restaurant (organisation)…</p> : null}
@@ -90,11 +96,18 @@ export function OverviewPage() {
 
       {!resolving && organizationId ? (
         <>
-          <h1 className={styles.h1}>Tableau de bord</h1>
-          <p className={styles.meta}>
-            Ce que tu vois ici vient de Firestore. Si quelqu’un saisit un relevé sur l’iPad,
-            ça apparaît ici sans recharger la page.
-          </p>
+          <section className={styles.hero}>
+            <div>
+              <p className={styles.kicker}>Contrôle HACCP</p>
+              <h1 className={styles.heroTitle}>Bonjour</h1>
+              <p className={styles.meta}>
+                Voici un aperçu de votre journée. Les saisies de l’iPad apparaissent ici en direct.
+              </p>
+            </div>
+            <div className={styles.dateBadge}>
+              <span className={styles.dateDay}>{dateLabel}</span>
+            </div>
+          </section>
 
           {loadingLists ? <p className="muted">Chargement des données…</p> : null}
 

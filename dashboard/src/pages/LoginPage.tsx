@@ -1,5 +1,6 @@
 import { FormEvent, useState } from "react";
 import { Navigate } from "react-router-dom";
+import { BrandLogo } from "../components/BrandLogo";
 import { useAuth } from "../contexts/AuthContext";
 import styles from "./LoginPage.module.css";
 
@@ -39,8 +40,9 @@ export function LoginPage() {
 
   return (
     <div className={styles.wrap}>
+      <div className={styles.glow} aria-hidden />
       <div className={styles.card}>
-        <h1 className={styles.title}>Hectare</h1>
+        <BrandLogo size="lg" className={styles.logo} />
         <p className={styles.subtitle}>Connecte-toi pour voir les données de l’iPad</p>
         <form className={styles.form} onSubmit={onSubmit}>
           <label className={styles.label}>
