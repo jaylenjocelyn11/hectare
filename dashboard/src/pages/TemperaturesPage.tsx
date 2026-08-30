@@ -1,8 +1,8 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { useOrgCollection } from "../hooks/useOrgCollection";
 import { asDate, formatDateTime } from "../lib/dates";
-import { asText } from "../lib/text";
+import { asText, namedFromDocs } from "../lib/text";
 import type { OrgContext } from "./orgContext";
 import styles from "./DashboardPage.module.css";
 
@@ -22,12 +22,6 @@ export function TemperaturesPage() {
   const equipment = useOrgCollection<Equipment>(organizationId, "equipment");
   const readings = useOrgCollection<TempReading>(organizationId, "tempReadings");
   const [onlyOutOfRange, setOnlyOutOfRange] = useState(false);
-
-  const nameById = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const e of equipment.docs) map.set(e.id, e.name || e.id);
-    return map;
-  }, [equipment.docs]);
 
   const rows = [...readings.docs]
     .filter((r) => (onlyOutOfRange ? r.isOutOfRange : true))
@@ -82,7 +76,9 @@ export function TemperaturesPage() {
                   {rows.map((r) => (
                     <tr key={r.id}>
                       <td>{formatDateTime(r.timestamp ?? r.date)}</td>
-                      <td>{r.equipmentId ? nameById.get(r.equipmentId) ?? r.equipmentId : "—"}</td>
+                      <td>
+                        {namedFromDocs(equipment.docs, r.equipmentId, "—")}
+                      </td>
                       <td>
                         {typeof r.temperature === "number" ? `${r.temperature} °C` : "—"}
                       </td>
