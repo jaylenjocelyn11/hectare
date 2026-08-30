@@ -1,5 +1,6 @@
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { DashboardLayout } from "./pages/DashboardLayout";
 import { LoginPage } from "./pages/LoginPage";
@@ -9,8 +10,9 @@ import { TemperaturesPage } from "./pages/TemperaturesPage";
 
 export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, "") || undefined}>
+    <ErrorBoundary>
+      <AuthProvider>
+        <HashRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route
@@ -27,7 +29,8 @@ export default function App() {
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+        </HashRouter>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }

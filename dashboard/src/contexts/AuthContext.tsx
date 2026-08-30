@@ -29,11 +29,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const auth = getFirebaseAuth();
-    return onAuthStateChanged(auth, (next) => {
-      setUser(next);
+    try {
+      const auth = getFirebaseAuth();
+      return onAuthStateChanged(auth, (next) => {
+        setUser(next);
+        setLoading(false);
+      });
+    } catch {
       setLoading(false);
-    });
+      return undefined;
+    }
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {

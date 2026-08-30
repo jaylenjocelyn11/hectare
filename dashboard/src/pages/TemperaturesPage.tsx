@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { useOrgCollection } from "../hooks/useOrgCollection";
 import { asDate, formatDateTime } from "../lib/dates";
+import { asText } from "../lib/text";
 import type { OrgContext } from "./orgContext";
 import styles from "./DashboardPage.module.css";
 
@@ -85,7 +86,7 @@ export function TemperaturesPage() {
                       <td>
                         {typeof r.temperature === "number" ? `${r.temperature} °C` : "—"}
                       </td>
-                      <td>{r.timePeriod || "—"}</td>
+                      <td>{asText(r.timePeriod)}</td>
                       <td>
                         {r.isOutOfRange ? (
                           <span className={styles.tagBad}>Hors plage</span>

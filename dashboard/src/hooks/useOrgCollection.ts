@@ -1,12 +1,45 @@
 import { useEffect, useState } from "react";
-import { collection, onSnapshot, type DocumentData } from "firebase/firestore";
+import {
+  collection,
+  limit,
+  onSnapshot,
+  query,
+  type DocumentData,
+} from "firebase/firestore";
 import { getFirebaseFirestore } from "../lib/firebase";
 
 export type OrgDoc<T> = T & { id: string };
 
+const HEAVY_KEYS = new Set([
+  "photos",
+  "signatureData",
+  "signature",
+  "imageData",
+  "photo",
+]);
+
+function slim(data: DocumentData): DocumentData {
+  const out: DocumentData = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (HEAVY_KEYS.has(key)) continue;
+    if (key === "runSteps" && Array.isArray(value)) {
+      out[key] = value.map((step) => {
+        if (!step || typeof step !== "object") return step;
+        const copy = { ...(step as DocumentData) };
+        delete copy.photos;
+        delete copy.photo;
+        return copy;
+      });
+      continue;
+    }
+    out[key] = value;
+  }
+  return out;
+}
+
 /**
- * Écoute une « tiroir » (collection) sous organizations/{orgId}.
- * Dès qu’un iPad écrit dans Firestore, cette liste se met à jour toute seule.
+ * Écoute une collection sous organizations/{orgId}.
+ * On ignore photos/signatures pour ne pas faire planter le navigateur.
  */
 export function useOrgCollection<T extends DocumentData>(
   organizationId: string | null,
@@ -25,24 +58,32 @@ export function useOrgCollection<T extends DocumentData>(
     }
 
     setLoading(true);
-    const db = getFirebaseFirestore();
-    const ref = collection(db, "organizations", organizationId, collectionName);
+    let unsub = () => {};
+    try {
+      const db = getFirebaseFirestore();
+      const ref = query(
+        collection(db, "organizations", organizationId, collectionName),
+        limit(80)
+      );
 
-    const unsub = onSnapshot(
-      ref,
-      (snap) => {
-        setError(null);
-        setLoading(false);
-        setDocs(
-          snap.docs.map((d) => ({ id: d.id, ...(d.data() as T) }))
-        );
-      },
-      (err) => {
-        setLoading(false);
-        setError(err.message);
-        setDocs([]);
-      }
-    );
+      unsub = onSnapshot(
+        ref,
+        (snap) => {
+          setError(null);
+          setLoading(false);
+          setDocs(snap.docs.map((d) => ({ id: d.id, ...(slim(d.data()) as T) })));
+        },
+        (err) => {
+          setLoading(false);
+          setError(err.message);
+          setDocs([]);
+        }
+      );
+    } catch (e) {
+      setLoading(false);
+      setError(e instanceof Error ? e.message : "Organisation invalide");
+      setDocs([]);
+    }
 
     return () => unsub();
   }, [organizationId, collectionName]);

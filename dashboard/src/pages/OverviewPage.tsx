@@ -1,6 +1,7 @@
 import { useOutletContext } from "react-router-dom";
 import { useOrgCollection } from "../hooks/useOrgCollection";
 import { asDate, formatDateTime, isSameLocalDay } from "../lib/dates";
+import { asText } from "../lib/text";
 import type { OrgContext } from "./orgContext";
 import styles from "./DashboardPage.module.css";
 
@@ -54,7 +55,7 @@ export function OverviewPage() {
   const outOfRangeToday = readingsToday.filter((r) => r.isOutOfRange).length;
   const activeEquipment = equipment.docs.filter((e) => e.isActive !== false).length;
   const runsInProgress = runs.docs.filter((r) => {
-    const s = (r.status ?? "").toLowerCase();
+    const s = asText(r.status, "").toLowerCase();
     return s === "running" || s === "inprogress" || s === "paused";
   }).length;
   const overdueRuns = runs.docs.filter((r) => r.isOverdue).length;
@@ -139,10 +140,10 @@ export function OverviewPage() {
                   {latestReadings.map((r) => (
                     <tr key={r.id}>
                       <td>{formatDateTime(r.timestamp ?? r.date)}</td>
-                      <td>{equipmentName(r.equipmentId)}</td>
+                      <td>{equipmentName(typeof r.equipmentId === "string" ? r.equipmentId : undefined)}</td>
                       <td>
                         {typeof r.temperature === "number" ? `${r.temperature} °C` : "—"}
-                        {r.timePeriod ? ` (${r.timePeriod})` : ""}
+                        {asText(r.timePeriod, "") ? ` (${asText(r.timePeriod, "")})` : ""}
                       </td>
                       <td>
                         {r.isOutOfRange ? (
@@ -176,9 +177,9 @@ export function OverviewPage() {
                   {latestRuns.map((r) => (
                     <tr key={r.id}>
                       <td>{formatDateTime(r.startTime ?? r.date)}</td>
-                      <td>{templateName(r.procedureTemplateId)}</td>
+                      <td>{templateName(typeof r.procedureTemplateId === "string" ? r.procedureTemplateId : undefined)}</td>
                       <td>{statusLabel(r.status, r.isOverdue)}</td>
-                      <td>{r.signedBy || "—"}</td>
+                      <td>{asText(r.signedBy)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -191,12 +192,12 @@ export function OverviewPage() {
   );
 }
 
-function statusLabel(status?: string, overdue?: boolean) {
-  const s = (status ?? "").toLowerCase();
+function statusLabel(status: unknown, overdue?: boolean) {
+  const s = asText(status, "").toLowerCase();
   if (overdue) return <span className={styles.tagBad}>En retard</span>;
   if (s === "completed") return <span className={styles.tagOk}>Terminée</span>;
   if (s === "running" || s === "inprogress") return <span className={styles.tagWarn}>En cours</span>;
   if (s === "paused") return <span className={styles.tagWarn}>En pause</span>;
   if (s === "cancelled") return <span className={styles.tagMuted}>Annulée</span>;
-  return status || "—";
+  return asText(status);
 }

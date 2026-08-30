@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { doc, getDoc } from "firebase/firestore";
 import { getFirebaseFirestore } from "../lib/firebase";
+import { asOrgId } from "../lib/text";
 import type { User } from "firebase/auth";
 
 /**
@@ -33,10 +34,7 @@ export function useOrganizationId(user: User | null): {
       try {
         const db = getFirebaseFirestore();
         const snap = await getDoc(doc(db, "dashboardUsers", user.uid));
-        const fromProfile =
-          snap.exists() && typeof snap.data()?.organizationId === "string"
-            ? (snap.data()?.organizationId as string)
-            : null;
+        const fromProfile = snap.exists() ? asOrgId(snap.data()?.organizationId) : null;
         const fromEnv =
           (import.meta.env.VITE_DEV_ORG_ID as string | undefined)?.trim() || null;
 

@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useOutletContext } from "react-router-dom";
 import { useOrgCollection } from "../hooks/useOrgCollection";
 import { asDate, formatDateTime } from "../lib/dates";
+import { asText } from "../lib/text";
 import type { OrgContext } from "./orgContext";
 import styles from "./DashboardPage.module.css";
 
@@ -97,7 +98,7 @@ export function ProceduresPage() {
                           : "—"}
                       </td>
                       <td>{statusLabel(r.status, r.isOverdue)}</td>
-                      <td>{r.signedBy || "—"}</td>
+                      <td>{asText(r.signedBy)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -110,12 +111,12 @@ export function ProceduresPage() {
   );
 }
 
-function statusLabel(status?: string, overdue?: boolean) {
-  const s = (status ?? "").toLowerCase();
+function statusLabel(status: unknown, overdue?: boolean) {
+  const s = asText(status, "").toLowerCase();
   if (overdue) return <span className={styles.tagBad}>En retard</span>;
   if (s === "completed") return <span className={styles.tagOk}>Terminée</span>;
   if (s === "running" || s === "inprogress") return <span className={styles.tagWarn}>En cours</span>;
   if (s === "paused") return <span className={styles.tagWarn}>En pause</span>;
   if (s === "cancelled") return <span className={styles.tagMuted}>Annulée</span>;
-  return status || "—";
+  return asText(status);
 }
