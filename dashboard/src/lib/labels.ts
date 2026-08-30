@@ -1,4 +1,4 @@
-import { asText } from "./text";
+import { asText, isInternalEquipmentType } from "./text";
 
 export function inventoryCategoryLabel(value: unknown): string {
   switch (asText(value, "").toLowerCase()) {
@@ -58,4 +58,29 @@ export function scheduleTypeLabel(value: unknown): string {
     default:
       return asText(value);
   }
+}
+
+export function equipmentKindLabel(value: unknown): string {
+  switch (asText(value, "").toLowerCase()) {
+    case "cold":
+      return "Froid";
+    case "hot":
+      return "Chaud";
+    case "ambient":
+      return "Ambiance";
+    case "freezer":
+      return "Congélateur";
+    case "refrigerator":
+      return "Réfrigérateur";
+    default:
+      return asText(value, "");
+  }
+}
+
+export function equipmentTypeLabel(type: unknown, kind: unknown): string {
+  const kindLabel = equipmentKindLabel(kind);
+  if (isInternalEquipmentType(type)) return kindLabel || "—";
+  const typeLabel = asText(type, "");
+  if (kindLabel && kindLabel !== typeLabel) return `${typeLabel} · ${kindLabel}`;
+  return typeLabel || "—";
 }

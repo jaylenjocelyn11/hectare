@@ -1,8 +1,7 @@
-import { useMemo } from "react";
 import { useOutletContext } from "react-router-dom";
 import { useOrgCollection } from "../hooks/useOrgCollection";
 import { asDate, formatDateTime } from "../lib/dates";
-import { asText } from "../lib/text";
+import { asDisplayName, asText, namedFromDocs } from "../lib/text";
 import type { OrgContext } from "./orgContext";
 import styles from "./DashboardPage.module.css";
 
@@ -25,12 +24,6 @@ export function ProceduresPage() {
     "procedureTemplates"
   );
   const runs = useOrgCollection<ProcedureRun>(organizationId, "procedureRuns");
-
-  const nameById = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const t of templates.docs) map.set(t.id, t.name || t.id);
-    return map;
-  }, [templates.docs]);
 
   const rows = [...runs.docs].sort((a, b) => {
     const da = asDate(a.startTime) ?? asDate(a.date);
@@ -60,8 +53,8 @@ export function ProceduresPage() {
             <ul className={styles.list}>
               {templates.docs.map((t) => (
                 <li key={t.id}>
-                  <strong>{t.name || t.id}</strong>
-                  {t.type ? <span className="muted"> — {t.type}</span> : null}
+                  <strong>{asDisplayName(t.name, t.id)}</strong>
+                  {asText(t.type, "") ? <span className="muted"> — {asText(t.type)}</span> : null}
                 </li>
               ))}
             </ul>
@@ -89,7 +82,7 @@ export function ProceduresPage() {
                       <td>{formatDateTime(r.startTime ?? r.date)}</td>
                       <td>
                         {r.procedureTemplateId
-                          ? nameById.get(r.procedureTemplateId) ?? r.procedureTemplateId
+                          ? namedFromDocs(templates.docs, r.procedureTemplateId, "Procédure")
                           : "—"}
                       </td>
                       <td>

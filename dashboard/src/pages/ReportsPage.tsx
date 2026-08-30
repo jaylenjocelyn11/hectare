@@ -3,7 +3,7 @@ import { useOutletContext } from "react-router-dom";
 import { useOrgCollection } from "../hooks/useOrgCollection";
 import { asDate, formatDateTime } from "../lib/dates";
 import { noteCategoryLabel } from "../lib/labels";
-import { asNumber, asText } from "../lib/text";
+import { asNumber, asText, namedFromDocs } from "../lib/text";
 import type { OrgContext } from "./orgContext";
 import { PageShell } from "./PageShell";
 import styles from "./DashboardPage.module.css";
@@ -94,10 +94,8 @@ export function ReportsPage() {
     return qty != null && min != null && qty <= min;
   }).length;
 
-  const equipmentName = (id?: string) =>
-    equipment.docs.find((e) => e.id === id)?.name ?? "Équipement";
-  const templateName = (id?: string) =>
-    templates.docs.find((t) => t.id === id)?.name ?? "Procédure";
+  const equipmentName = (id?: unknown) => namedFromDocs(equipment.docs, id, "—");
+  const templateName = (id?: unknown) => namedFromDocs(templates.docs, id, "Procédure");
 
   return (
     <PageShell
@@ -190,7 +188,7 @@ export function ReportsPage() {
             .map((r) => (
               <li key={r.id}>
                 {formatDateTime(r.timestamp ?? r.date)} —{" "}
-                {equipmentName(typeof r.equipmentId === "string" ? r.equipmentId : undefined)}
+                {equipmentName(r.equipmentId)}
                 {typeof r.temperature === "number" ? ` · ${r.temperature} °C` : ""}
               </li>
             ))}
@@ -205,9 +203,7 @@ export function ReportsPage() {
           {periodRuns.slice(0, 15).map((r) => (
             <li key={r.id}>
               {formatDateTime(r.startTime ?? r.date)} —{" "}
-              {templateName(
-                typeof r.procedureTemplateId === "string" ? r.procedureTemplateId : undefined
-              )}{" "}
+              {templateName(r.procedureTemplateId)}{" "}
               · {asText(r.status)}
               {asText(r.signedBy, "") ? ` · ${asText(r.signedBy)}` : ""}
             </li>

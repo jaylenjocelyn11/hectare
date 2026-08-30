@@ -21,7 +21,11 @@ export class ErrorBoundary extends Component<Props, State> {
           <p>
             Le tableau de bord a rencontré un problème. Recharge la page. Si ça continue, reconnecte-toi.
           </p>
-          <p className="muted">{this.state.message}</p>
+          <p className="muted">
+            {this.state.message.startsWith("Objects are not valid")
+              ? "Une donnée technique n’a pas pu s’afficher. Recharge la page."
+              : this.state.message}
+          </p>
           <button type="button" className="btnGold" onClick={() => window.location.reload()}>
             Recharger
           </button>

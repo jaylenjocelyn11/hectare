@@ -1,7 +1,7 @@
 import { useOutletContext } from "react-router-dom";
 import { useOrgCollection } from "../hooks/useOrgCollection";
 import { asDate, formatDateTime, isSameLocalDay } from "../lib/dates";
-import { asText } from "../lib/text";
+import { asText, namedFromDocs } from "../lib/text";
 import type { OrgContext } from "./orgContext";
 import styles from "./DashboardPage.module.css";
 
@@ -60,11 +60,9 @@ export function OverviewPage() {
   }).length;
   const overdueRuns = runs.docs.filter((r) => r.isOverdue).length;
 
-  const templateName = (id?: string) =>
-    templates.docs.find((t) => t.id === id)?.name ?? "Procédure";
+  const templateName = (id?: unknown) => namedFromDocs(templates.docs, id, "Procédure");
 
-  const equipmentName = (id?: string) =>
-    equipment.docs.find((e) => e.id === id)?.name ?? "Équipement";
+  const equipmentName = (id?: unknown) => namedFromDocs(equipment.docs, id, "—");
 
   const latestReadings = [...readings.docs]
     .sort((a, b) => {
@@ -153,7 +151,7 @@ export function OverviewPage() {
                   {latestReadings.map((r) => (
                     <tr key={r.id}>
                       <td>{formatDateTime(r.timestamp ?? r.date)}</td>
-                      <td>{equipmentName(typeof r.equipmentId === "string" ? r.equipmentId : undefined)}</td>
+                      <td>{equipmentName(r.equipmentId)}</td>
                       <td>
                         {typeof r.temperature === "number" ? `${r.temperature} °C` : "—"}
                         {asText(r.timePeriod, "") ? ` (${asText(r.timePeriod, "")})` : ""}
@@ -190,7 +188,7 @@ export function OverviewPage() {
                   {latestRuns.map((r) => (
                     <tr key={r.id}>
                       <td>{formatDateTime(r.startTime ?? r.date)}</td>
-                      <td>{templateName(typeof r.procedureTemplateId === "string" ? r.procedureTemplateId : undefined)}</td>
+                      <td>{templateName(r.procedureTemplateId)}</td>
                       <td>{statusLabel(r.status, r.isOverdue)}</td>
                       <td>{asText(r.signedBy)}</td>
                     </tr>

@@ -1,8 +1,8 @@
 import { useOutletContext } from "react-router-dom";
 import { useOrgCollection } from "../hooks/useOrgCollection";
 import { formatDateTime } from "../lib/dates";
-import { scheduleTypeLabel, userRoleLabel } from "../lib/labels";
-import { asNumber, asText } from "../lib/text";
+import { equipmentTypeLabel, scheduleTypeLabel, userRoleLabel } from "../lib/labels";
+import { asDisplayName, asNumber, asText } from "../lib/text";
 import type { OrgContext } from "./orgContext";
 import { PageShell } from "./PageShell";
 import styles from "./DashboardPage.module.css";
@@ -106,11 +106,8 @@ export function SettingsPage() {
                 .sort((a, b) => asText(a.name).localeCompare(asText(b.name), "fr"))
                 .map((e) => (
                   <tr key={e.id}>
-                    <td>{asText(e.name)}</td>
-                    <td>
-                      {asText(e.type)}
-                      {asText(e.kind, "") ? ` · ${asText(e.kind)}` : ""}
-                    </td>
+                    <td>{asDisplayName(e.name)}</td>
+                    <td>{equipmentTypeLabel(e.type, e.kind)}</td>
                     <td>
                       {asNumber(e.minTemperature) != null && asNumber(e.maxTemperature) != null
                         ? `${asNumber(e.minTemperature)} – ${asNumber(e.maxTemperature)} °C`
