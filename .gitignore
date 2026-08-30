@@ -1,0 +1,23 @@
+# Secrets — ne jamais envoyer sur GitHub
+.env
+.env.local
+*.p12
+*.pem
+*.mobileprovision
+
+# Node / site
+node_modules
+dashboard/node_modules
+dashboard/dist
+
+# Xcode
+xcuserdata/
+*.xcuserstate
+DerivedData/
+
+# Logs locaux
+build.log
+build_errors.log
+build_output.log
+build_warnings.log
+.DS_Store
