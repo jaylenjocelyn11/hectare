@@ -29,25 +29,27 @@ export function DashboardLayout() {
 
       <aside className={styles.sidebar}>
         <nav className={styles.nav}>
-          <NavLink
-            to="/"
-            end
-            className={({ isActive }) => (isActive ? styles.navActive : styles.navLink)}
-          >
-            Vue d’ensemble
-          </NavLink>
-          <NavLink
-            to="/temperatures"
-            className={({ isActive }) => (isActive ? styles.navActive : styles.navLink)}
-          >
-            Températures
-          </NavLink>
-          <NavLink
-            to="/procedures"
-            className={({ isActive }) => (isActive ? styles.navActive : styles.navLink)}
-          >
-            Procédures
-          </NavLink>
+          {(
+            [
+              ["/", "Tableau de bord", true],
+              ["/temperatures", "Températures", false],
+              ["/procedures", "Procédures", false],
+              ["/recipes", "Recettes", false],
+              ["/inventory", "Inventaire", false],
+              ["/groups", "Groupe", false],
+              ["/reports", "Rapports", false],
+              ["/settings", "Paramètres", false],
+            ] as const
+          ).map(([to, label, end]) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={end}
+              className={({ isActive }) => (isActive ? styles.navActive : styles.navLink)}
+            >
+              {label}
+            </NavLink>
+          ))}
         </nav>
       </aside>
 

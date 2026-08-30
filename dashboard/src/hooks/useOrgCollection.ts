@@ -16,6 +16,9 @@ const HEAVY_KEYS = new Set([
   "signature",
   "imageData",
   "photo",
+  "pin",
+  "password",
+  "fcmTokens",
 ]);
 
 function slim(data: DocumentData): DocumentData {

@@ -1,0 +1,219 @@
+import { useMemo, useState } from "react";
+import { useOutletContext } from "react-router-dom";
+import { useOrgCollection } from "../hooks/useOrgCollection";
+import { asDate, formatDateTime } from "../lib/dates";
+import { noteCategoryLabel } from "../lib/labels";
+import { asNumber, asText } from "../lib/text";
+import type { OrgContext } from "./orgContext";
+import { PageShell } from "./PageShell";
+import styles from "./DashboardPage.module.css";
+
+type TempReading = {
+  timestamp?: unknown;
+  date?: unknown;
+  isOutOfRange?: boolean;
+  temperature?: number;
+  equipmentId?: string;
+};
+
+type ProcedureRun = {
+  startTime?: unknown;
+  date?: unknown;
+  status?: string;
+  isOverdue?: boolean;
+  signedBy?: string;
+  procedureTemplateId?: string;
+};
+
+type InventoryItem = {
+  name?: string;
+  quantity?: number;
+  minStockLevel?: number;
+};
+
+type Note = {
+  title?: string;
+  content?: string;
+  authorName?: string;
+  createdAt?: unknown;
+  isImportant?: boolean;
+  category?: string;
+};
+
+type Equipment = { name?: string };
+type ProcedureTemplate = { name?: string };
+
+type Period = "today" | "week" | "month";
+
+function startOfPeriod(period: Period): Date {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  if (period === "week") d.setDate(d.getDate() - 6);
+  if (period === "month") d.setDate(d.getDate() - 29);
+  return d;
+}
+
+function inPeriod(value: unknown, period: Period): boolean {
+  const d = asDate(value);
+  if (!d) return false;
+  return d.getTime() >= startOfPeriod(period).getTime();
+}
+
+export function ReportsPage() {
+  const { organizationId } = useOutletContext<OrgContext>();
+  const [period, setPeriod] = useState<Period>("week");
+  const equipment = useOrgCollection<Equipment>(organizationId, "equipment");
+  const readings = useOrgCollection<TempReading>(organizationId, "tempReadings");
+  const templates = useOrgCollection<ProcedureTemplate>(organizationId, "procedureTemplates");
+  const runs = useOrgCollection<ProcedureRun>(organizationId, "procedureRuns");
+  const inventory = useOrgCollection<InventoryItem>(organizationId, "inventory");
+  const notes = useOrgCollection<Note>(organizationId, "notes");
+
+  const periodReadings = useMemo(
+    () => readings.docs.filter((r) => inPeriod(r.timestamp ?? r.date, period)),
+    [readings.docs, period]
+  );
+  const periodRuns = useMemo(
+    () => runs.docs.filter((r) => inPeriod(r.startTime ?? r.date, period)),
+    [runs.docs, period]
+  );
+  const periodNotes = useMemo(
+    () =>
+      [...notes.docs]
+        .filter((n) => inPeriod(n.createdAt, period))
+        .sort((a, b) => (asDate(b.createdAt)?.getTime() ?? 0) - (asDate(a.createdAt)?.getTime() ?? 0)),
+    [notes.docs, period]
+  );
+
+  const outOfRange = periodReadings.filter((r) => r.isOutOfRange).length;
+  const completed = periodRuns.filter((r) => asText(r.status, "").toLowerCase() === "completed").length;
+  const overdue = periodRuns.filter((r) => r.isOverdue).length;
+  const lowStock = inventory.docs.filter((item) => {
+    const qty = asNumber(item.quantity);
+    const min = asNumber(item.minStockLevel);
+    return qty != null && min != null && qty <= min;
+  }).length;
+
+  const equipmentName = (id?: string) =>
+    equipment.docs.find((e) => e.id === id)?.name ?? "Équipement";
+  const templateName = (id?: string) =>
+    templates.docs.find((t) => t.id === id)?.name ?? "Procédure";
+
+  return (
+    <PageShell
+      errors={[
+        equipment.error,
+        readings.error,
+        templates.error,
+        runs.error,
+        inventory.error,
+        notes.error,
+      ]}
+    >
+      <h1 className={styles.h1}>Rapports</h1>
+      <p className={styles.meta}>Historique HACCP à partir des données de l’iPad (80 derniers documents par type).</p>
+
+      <label className={styles.filter}>
+        Période
+        <select value={period} onChange={(e) => setPeriod(e.target.value as Period)}>
+          <option value="today">Aujourd’hui</option>
+          <option value="week">7 derniers jours</option>
+          <option value="month">30 derniers jours</option>
+        </select>
+      </label>
+
+      <div className={styles.kpis}>
+        <article className={styles.kpi}>
+          <span className={styles.kpiLabel}>Relevés</span>
+          <strong className={styles.kpiValue}>{periodReadings.length}</strong>
+        </article>
+        <article className={styles.kpi}>
+          <span className={styles.kpiLabel}>Hors plage</span>
+          <strong className={`${styles.kpiValue} ${outOfRange ? styles.danger : ""}`}>
+            {outOfRange}
+          </strong>
+        </article>
+        <article className={styles.kpi}>
+          <span className={styles.kpiLabel}>Procédures terminées</span>
+          <strong className={styles.kpiValue}>{completed}</strong>
+        </article>
+        <article className={styles.kpi}>
+          <span className={styles.kpiLabel}>En retard / stock bas</span>
+          <strong className={styles.kpiValue}>
+            {overdue} / {lowStock}
+          </strong>
+        </article>
+      </div>
+
+      <h2 className={styles.h2}>Notes</h2>
+      {periodNotes.length === 0 ? (
+        <p className="muted">Aucune note sur cette période.</p>
+      ) : (
+        <div className={styles.tableWrap}>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th>Quand</th>
+                <th>Titre</th>
+                <th>Catégorie</th>
+                <th>Auteur</th>
+              </tr>
+            </thead>
+            <tbody>
+              {periodNotes.slice(0, 20).map((n) => (
+                <tr key={n.id}>
+                  <td>{formatDateTime(n.createdAt)}</td>
+                  <td className={styles.wrap}>
+                    {asText(n.title)}
+                    {n.isImportant ? <span className={styles.tagWarn}> Important</span> : null}
+                    {asText(n.content, "") ? (
+                      <div className="muted">{asText(n.content)}</div>
+                    ) : null}
+                  </td>
+                  <td>{noteCategoryLabel(n.category)}</td>
+                  <td>{asText(n.authorName)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <h2 className={styles.h2}>Relevés hors plage</h2>
+      {periodReadings.filter((r) => r.isOutOfRange).length === 0 ? (
+        <p className="muted">Aucun relevé hors plage sur cette période.</p>
+      ) : (
+        <ul className={styles.list}>
+          {periodReadings
+            .filter((r) => r.isOutOfRange)
+            .slice(0, 15)
+            .map((r) => (
+              <li key={r.id}>
+                {formatDateTime(r.timestamp ?? r.date)} —{" "}
+                {equipmentName(typeof r.equipmentId === "string" ? r.equipmentId : undefined)}
+                {typeof r.temperature === "number" ? ` · ${r.temperature} °C` : ""}
+              </li>
+            ))}
+        </ul>
+      )}
+
+      <h2 className={styles.h2}>Procédures de la période</h2>
+      {periodRuns.length === 0 ? (
+        <p className="muted">Aucune procédure sur cette période.</p>
+      ) : (
+        <ul className={styles.list}>
+          {periodRuns.slice(0, 15).map((r) => (
+            <li key={r.id}>
+              {formatDateTime(r.startTime ?? r.date)} —{" "}
+              {templateName(
+                typeof r.procedureTemplateId === "string" ? r.procedureTemplateId : undefined
+              )}{" "}
+              · {asText(r.status)}
+              {asText(r.signedBy, "") ? ` · ${asText(r.signedBy)}` : ""}
+            </li>
+          ))}
+        </ul>
+      )}
+    </PageShell>
+  );
+}

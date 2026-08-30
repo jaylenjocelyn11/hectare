@@ -1,7 +1,7 @@
 .layout {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 220px 1fr;
+  grid-template-columns: 210px 1fr;
   grid-template-rows: auto 1fr;
   grid-template-areas:
     "header header"
@@ -164,6 +164,39 @@
   padding: 0.65rem 0.85rem;
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
+}
+
+.wrap {
+  white-space: normal;
+  max-width: 28rem;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.35rem;
+}
+
+.filter select {
+  padding: 0.25rem 0.4rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface);
 }
 
 .table th {

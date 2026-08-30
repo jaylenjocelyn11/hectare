@@ -90,7 +90,7 @@ export function OverviewPage() {
 
       {!resolving && organizationId ? (
         <>
-          <h1 className={styles.h1}>Vue d’ensemble</h1>
+          <h1 className={styles.h1}>Tableau de bord</h1>
           <p className={styles.meta}>
             Ce que tu vois ici vient de Firestore. Si quelqu’un saisit un relevé sur l’iPad,
             ça apparaît ici sans recharger la page.
