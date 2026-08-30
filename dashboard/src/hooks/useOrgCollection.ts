@@ -8,7 +8,17 @@ import {
 } from "firebase/firestore";
 import { getFirebaseFirestore } from "../lib/firebase";
 
-export type OrgDoc<T> = T & { id: string };
+export type OrgDoc<T> = T & { id: string; linkedId?: string };
+
+/** Listes courtes (équipements, utilisateurs…) : on charge large pour pouvoir retrouver les noms. */
+const SMALL_COLLECTIONS = new Set([
+  "equipment",
+  "users",
+  "procedureTemplates",
+  "temperatureSchedules",
+  "recipes",
+  "inventory",
+]);
 
 const HEAVY_KEYS = new Set([
   "photos",
@@ -19,6 +29,7 @@ const HEAVY_KEYS = new Set([
   "pin",
   "password",
   "fcmTokens",
+  "correctiveActions",
 ]);
 
 function slim(data: DocumentData): DocumentData {
@@ -64,9 +75,10 @@ export function useOrgCollection<T extends DocumentData>(
     let unsub = () => {};
     try {
       const db = getFirebaseFirestore();
+      const cap = SMALL_COLLECTIONS.has(collectionName) ? 500 : 80;
       const ref = query(
         collection(db, "organizations", organizationId, collectionName),
-        limit(80)
+        limit(cap)
       );
 
       unsub = onSnapshot(
@@ -74,7 +86,17 @@ export function useOrgCollection<T extends DocumentData>(
         (snap) => {
           setError(null);
           setLoading(false);
-          setDocs(snap.docs.map((d) => ({ id: d.id, ...(slim(d.data()) as T) })));
+          setDocs(
+            snap.docs.map((d) => {
+              const data = slim(d.data()) as T;
+              const dataId = (data as { id?: unknown }).id;
+              return {
+                ...data,
+                id: d.id,
+                linkedId: typeof dataId === "string" && dataId !== d.id ? dataId : undefined,
+              };
+            })
+          );
         },
         (err) => {
           setLoading(false);
