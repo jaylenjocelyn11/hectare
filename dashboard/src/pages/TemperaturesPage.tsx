@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { useOutletContext } from "react-router-dom";
+import { useEquipment } from "../hooks/useEquipment";
 import { useOrgCollection } from "../hooks/useOrgCollection";
 import { asDate, formatDateTime } from "../lib/dates";
 import { asText, namedFromDocs } from "../lib/text";
 import type { OrgContext } from "./orgContext";
 import styles from "./DashboardPage.module.css";
 
-type Equipment = { name?: string };
 type TempReading = {
   temperature?: number;
   timestamp?: unknown;
@@ -19,7 +19,7 @@ type TempReading = {
 
 export function TemperaturesPage() {
   const { organizationId, resolving, error: orgError } = useOutletContext<OrgContext>();
-  const equipment = useOrgCollection<Equipment>(organizationId, "equipment");
+  const equipment = useEquipment(organizationId);
   const readings = useOrgCollection<TempReading>(organizationId, "tempReadings");
   const [onlyOutOfRange, setOnlyOutOfRange] = useState(false);
 
@@ -77,7 +77,7 @@ export function TemperaturesPage() {
                     <tr key={r.id}>
                       <td>{formatDateTime(r.timestamp ?? r.date)}</td>
                       <td>
-                        {namedFromDocs(equipment.docs, r.equipmentId, "—")}
+                        {namedFromDocs(equipment.lookup, r.equipmentId, "—")}
                       </td>
                       <td>
                         {typeof r.temperature === "number" ? `${r.temperature} °C` : "—"}

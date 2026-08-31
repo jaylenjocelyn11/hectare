@@ -13,6 +13,7 @@ export type OrgDoc<T> = T & { id: string; linkedId?: string };
 /** Listes courtes (équipements, utilisateurs…) : on charge large pour pouvoir retrouver les noms. */
 const SMALL_COLLECTIONS = new Set([
   "equipment",
+  "equipments",
   "users",
   "procedureTemplates",
   "temperatureSchedules",

@@ -1,5 +1,9 @@
-import { initializeApp, type FirebaseApp } from "firebase/app";
-import { getAuth, type Auth } from "firebase/auth";
+import { deleteApp, initializeApp, type FirebaseApp } from "firebase/app";
+import {
+  createUserWithEmailAndPassword,
+  getAuth,
+  type Auth,
+} from "firebase/auth";
 import { getFirestore, type Firestore } from "firebase/firestore";
 
 function readConfig() {
@@ -60,4 +64,15 @@ export function getFirebaseFirestore(): Firestore {
     db = getFirestore(getFirebaseApp(), databaseId);
   }
   return db;
+}
+
+/** Crée un compte resto sans déconnecter l’admin connecté. */
+export async function createOrgAuthUser(email: string, password: string): Promise<string> {
+  const secondary = initializeApp(readConfig(), `org-signup-${Date.now()}`);
+  try {
+    const cred = await createUserWithEmailAndPassword(getAuth(secondary), email, password);
+    return cred.user.uid;
+  } finally {
+    await deleteApp(secondary);
+  }
 }

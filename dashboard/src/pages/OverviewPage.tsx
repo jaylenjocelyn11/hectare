@@ -1,14 +1,10 @@
 import { useOutletContext } from "react-router-dom";
+import { useEquipment } from "../hooks/useEquipment";
 import { useOrgCollection } from "../hooks/useOrgCollection";
 import { asDate, formatDateTime, isSameLocalDay } from "../lib/dates";
 import { asText, namedFromDocs } from "../lib/text";
 import type { OrgContext } from "./orgContext";
 import styles from "./DashboardPage.module.css";
-
-type Equipment = {
-  name?: string;
-  isActive?: boolean;
-};
 
 type TempReading = {
   temperature?: number;
@@ -34,7 +30,7 @@ type ProcedureTemplate = {
 
 export function OverviewPage() {
   const { organizationId, resolving, error: orgError } = useOutletContext<OrgContext>();
-  const equipment = useOrgCollection<Equipment>(organizationId, "equipment");
+  const equipment = useEquipment(organizationId);
   const readings = useOrgCollection<TempReading>(organizationId, "tempReadings");
   const runs = useOrgCollection<ProcedureRun>(organizationId, "procedureRuns");
   const templates = useOrgCollection<ProcedureTemplate>(
@@ -53,7 +49,7 @@ export function OverviewPage() {
     return d ? isSameLocalDay(d, today) : false;
   });
   const outOfRangeToday = readingsToday.filter((r) => r.isOutOfRange).length;
-  const activeEquipment = equipment.docs.filter((e) => e.isActive !== false).length;
+  const activeEquipment = equipment.list.filter((e) => e.isActive !== false).length;
   const runsInProgress = runs.docs.filter((r) => {
     const s = asText(r.status, "").toLowerCase();
     return s === "running" || s === "inprogress" || s === "paused";
@@ -62,7 +58,7 @@ export function OverviewPage() {
 
   const templateName = (id?: unknown) => namedFromDocs(templates.docs, id, "Procédure");
 
-  const equipmentName = (id?: unknown) => namedFromDocs(equipment.docs, id, "—");
+  const equipmentName = (id?: unknown) => namedFromDocs(equipment.lookup, id, "—");
 
   const latestReadings = [...readings.docs]
     .sort((a, b) => {

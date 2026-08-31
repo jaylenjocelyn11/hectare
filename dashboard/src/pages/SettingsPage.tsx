@@ -1,6 +1,11 @@
+import { FormEvent, useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
+import { doc, serverTimestamp, setDoc } from "firebase/firestore";
+import { useEquipment } from "../hooks/useEquipment";
 import { useOrgCollection } from "../hooks/useOrgCollection";
+import { NAV_ITEMS, type NavKey } from "../lib/dashboards";
 import { formatDateTime } from "../lib/dates";
+import { getFirebaseFirestore } from "../lib/firebase";
 import { equipmentTypeLabel, scheduleTypeLabel, userRoleLabel } from "../lib/labels";
 import { asDisplayName, asNumber, asText } from "../lib/text";
 import type { OrgContext } from "./orgContext";
@@ -12,15 +17,6 @@ type AppUser = {
   role?: string;
   isActive?: boolean;
   createdAt?: unknown;
-};
-
-type Equipment = {
-  name?: string;
-  type?: string;
-  kind?: string;
-  isActive?: boolean;
-  minTemperature?: number;
-  maxTemperature?: number;
 };
 
 type Schedule = {
@@ -37,10 +33,52 @@ function pad(n: number): string {
 }
 
 export function SettingsPage() {
-  const { organizationId } = useOutletContext<OrgContext>();
+  const session = useOutletContext<OrgContext>();
+  const { organizationId, dashboard, slug } = session;
   const users = useOrgCollection<AppUser>(organizationId, "users");
-  const equipment = useOrgCollection<Equipment>(organizationId, "equipment");
+  const equipment = useEquipment(organizationId);
   const schedules = useOrgCollection<Schedule>(organizationId, "temperatureSchedules");
+  const [dashName, setDashName] = useState(dashboard?.name ?? "");
+  const [tagline, setTagline] = useState(dashboard?.tagline ?? "Contrôle HACCP");
+  const [accent, setAccent] = useState(dashboard?.accent ?? "#c4a35a");
+  const [nav, setNav] = useState(dashboard?.nav ?? {});
+  const [savingLook, setSavingLook] = useState(false);
+  const [lookMsg, setLookMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!dashboard) return;
+    setDashName(dashboard.name);
+    setTagline(dashboard.tagline);
+    setAccent(dashboard.accent);
+    setNav(dashboard.nav);
+  }, [dashboard]);
+
+  async function saveLook(e: FormEvent) {
+    e.preventDefault();
+    if (!slug || !organizationId) return;
+    setSavingLook(true);
+    setLookMsg(null);
+    try {
+      await setDoc(
+        doc(getFirebaseFirestore(), "dashboards", slug),
+        {
+          slug,
+          organizationId,
+          name: dashName.trim() || slug,
+          tagline: tagline.trim() || "Contrôle HACCP",
+          accent: /^#[0-9a-fA-F]{6}$/.test(accent) ? accent : "#c4a35a",
+          nav,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+      setLookMsg("Apparence enregistrée. Recharge la page pour voir le menu à jour.");
+    } catch (err) {
+      setLookMsg(err instanceof Error ? err.message : "Enregistrement impossible");
+    } finally {
+      setSavingLook(false);
+    }
+  }
 
   return (
     <PageShell errors={[users.error, equipment.error, schedules.error]}>
@@ -49,6 +87,60 @@ export function SettingsPage() {
         Utilisateurs, équipements et horaires de relevé. Consultation seulement — les PIN et mots de
         passe ne s’affichent pas ici. Organisation : {organizationId}
       </p>
+
+      {slug && (dashboard?.persisted || session.isPlatformAdmin) ? (
+        <>
+          <h2 className={styles.h2}>Apparence de ce tableau de bord</h2>
+          <form className={styles.formStack} onSubmit={saveLook}>
+            <label className={styles.field}>
+              Nom affiché
+              <input
+                className={styles.fieldInput}
+                value={dashName}
+                onChange={(e) => setDashName(e.target.value)}
+              />
+            </label>
+            <label className={styles.field}>
+              Accroche
+              <input
+                className={styles.fieldInput}
+                value={tagline}
+                onChange={(e) => setTagline(e.target.value)}
+              />
+            </label>
+            <label className={styles.field}>
+              Couleur
+              <input
+                className={styles.fieldInput}
+                type="color"
+                value={/^#[0-9a-fA-F]{6}$/.test(accent) ? accent : "#c4a35a"}
+                onChange={(e) => setAccent(e.target.value)}
+              />
+            </label>
+            <fieldset className={styles.fieldset}>
+              <legend>Pages visibles</legend>
+              {NAV_ITEMS.filter((item) => item.key !== "overview" && item.key !== "settings").map(
+                (item) => (
+                  <label key={item.key} className={styles.checkRow}>
+                    <input
+                      type="checkbox"
+                      checked={nav[item.key as NavKey] !== false}
+                      onChange={(e) =>
+                        setNav((prev) => ({ ...prev, [item.key]: e.target.checked }))
+                      }
+                    />
+                    {item.label}
+                  </label>
+                )
+              )}
+            </fieldset>
+            {lookMsg ? <p className={styles.hint}>{lookMsg}</p> : null}
+            <button className="btnGold" type="submit" disabled={savingLook}>
+              {savingLook ? "Enregistrement…" : "Enregistrer l’apparence"}
+            </button>
+          </form>
+        </>
+      ) : null}
 
       <h2 className={styles.h2}>Utilisateurs</h2>
       {users.loading ? <p className="muted">Chargement…</p> : null}
@@ -88,7 +180,7 @@ export function SettingsPage() {
       )}
 
       <h2 className={styles.h2}>Équipements</h2>
-      {equipment.docs.length === 0 ? (
+      {equipment.list.length === 0 ? (
         <p className="muted">Aucun équipement.</p>
       ) : (
         <div className={styles.tableWrap}>
@@ -102,7 +194,7 @@ export function SettingsPage() {
               </tr>
             </thead>
             <tbody>
-              {[...equipment.docs]
+              {[...equipment.list]
                 .sort((a, b) => asText(a.name).localeCompare(asText(b.name), "fr"))
                 .map((e) => (
                   <tr key={e.id}>

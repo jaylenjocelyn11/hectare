@@ -421,3 +421,95 @@
     padding: 1.2rem 1rem 2.2rem;
   }
 }
+
+.brandName {
+  margin: 0.55rem 0 0;
+  font-family: var(--serif);
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.adminPage {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 1.75rem 1.5rem 3rem;
+}
+
+.adminTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.adminTopActions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.formStack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  max-width: 520px;
+  margin-bottom: 2rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.fieldInput {
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #0c0c0c;
+  color: var(--text);
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 400;
+  font-size: 0.95rem;
+}
+
+.hint {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.ok {
+  color: var(--ok);
+}
+
+.inlineCode {
+  font-size: 0.82em;
+  color: var(--gold-soft);
+}
+
+.fieldset {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+}
+
+.checkRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.35rem 0;
+  font-size: 0.9rem;
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 400;
+  color: var(--text);
+}
+

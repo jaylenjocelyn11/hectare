@@ -9,6 +9,7 @@ interface ImportMetaEnv {
   readonly VITE_FIREBASE_APP_ID: string;
   readonly VITE_FIRESTORE_DATABASE_ID: string;
   readonly VITE_DEV_ORG_ID: string;
+  readonly VITE_PLATFORM_ADMIN_EMAIL: string;
 }
 
 interface ImportMeta {

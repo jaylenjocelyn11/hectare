@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useOutletContext } from "react-router-dom";
+import { useEquipment } from "../hooks/useEquipment";
 import { useOrgCollection } from "../hooks/useOrgCollection";
 import { asDate, formatDateTime } from "../lib/dates";
 import { noteCategoryLabel } from "../lib/labels";
@@ -40,7 +41,6 @@ type Note = {
   category?: string;
 };
 
-type Equipment = { name?: string };
 type ProcedureTemplate = { name?: string };
 
 type Period = "today" | "week" | "month";
@@ -62,7 +62,7 @@ function inPeriod(value: unknown, period: Period): boolean {
 export function ReportsPage() {
   const { organizationId } = useOutletContext<OrgContext>();
   const [period, setPeriod] = useState<Period>("week");
-  const equipment = useOrgCollection<Equipment>(organizationId, "equipment");
+  const equipment = useEquipment(organizationId);
   const readings = useOrgCollection<TempReading>(organizationId, "tempReadings");
   const templates = useOrgCollection<ProcedureTemplate>(organizationId, "procedureTemplates");
   const runs = useOrgCollection<ProcedureRun>(organizationId, "procedureRuns");
@@ -94,7 +94,7 @@ export function ReportsPage() {
     return qty != null && min != null && qty <= min;
   }).length;
 
-  const equipmentName = (id?: unknown) => namedFromDocs(equipment.docs, id, "—");
+  const equipmentName = (id?: unknown) => namedFromDocs(equipment.lookup, id, "—");
   const templateName = (id?: unknown) => namedFromDocs(templates.docs, id, "Procédure");
 
   return (

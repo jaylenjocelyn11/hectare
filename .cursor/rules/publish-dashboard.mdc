@@ -1,0 +1,13 @@
+---
+description: After dashboard/web changes, commit and push so GitHub Pages updates.
+alwaysApply: true
+---
+
+# Publier le tableau de bord
+
+Quand tu modifies le site web (`dashboard/`) ou le workflow GitHub Pages, **commit et push sur `main`** dès que le travail est utilisable — sans attendre qu’on te le redemande.
+
+- Commit seulement les fichiers du dashboard (et `.github/workflows/deploy-dashboard.yml`).
+- N’inclus pas `.env`, secrets, `GoogleService-Info.plist`, ni les changements iOS non demandés.
+- Après le push, rappelle l’URL `https://jaylenjocelyn11.github.io/hectare/` et **Cmd+Shift+R**.
+- L’admin est `#/admin` (le `#` est obligatoire).

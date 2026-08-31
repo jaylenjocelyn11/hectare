@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useParams } from "react-router-dom";
 import { BrandLogo } from "../components/BrandLogo";
 import {
   IconBook,
@@ -11,48 +11,66 @@ import {
   IconThermometer,
 } from "../components/NavIcons";
 import { useAuth } from "../contexts/AuthContext";
-import { useOrganizationId } from "../hooks/useOrganizationId";
+import { useDashboardSession } from "../hooks/useDashboardSession";
+import { NAV_ITEMS, navVisible, themeFromAccent } from "../lib/dashboards";
 import styles from "./DashboardPage.module.css";
 
-const NAV = [
-  { to: "/", label: "Tableau de bord", end: true, icon: IconDashboard },
-  { to: "/temperatures", label: "Températures", end: false, icon: IconThermometer },
-  { to: "/procedures", label: "Procédures", end: false, icon: IconChecklist },
-  { to: "/recipes", label: "Recettes", end: false, icon: IconBook },
-  { to: "/inventory", label: "Inventaire", end: false, icon: IconBox },
-  { to: "/groups", label: "Groupe", end: false, icon: IconPeople },
-  { to: "/reports", label: "Rapports", end: false, icon: IconReport },
-  { to: "/settings", label: "Paramètres", end: false, icon: IconGear },
-] as const;
+const ICONS = {
+  overview: IconDashboard,
+  temperatures: IconThermometer,
+  procedures: IconChecklist,
+  recipes: IconBook,
+  inventory: IconBox,
+  groups: IconPeople,
+  reports: IconReport,
+  settings: IconGear,
+} as const;
 
 export function DashboardLayout() {
+  const { orgSlug } = useParams();
   const { user, signOutUser } = useAuth();
-  const org = useOrganizationId(user);
+  const session = useDashboardSession(user, orgSlug);
+  const slug = session.slug;
+  const accent = session.dashboard?.accent || "#c4a35a";
+  const tagline = session.dashboard?.tagline || "Contrôle HACCP";
+  const title = session.dashboard?.name;
 
   return (
-    <div className={styles.layout}>
+    <div className={styles.layout} style={themeFromAccent(accent)}>
       <aside className={styles.sidebar}>
         <div className={styles.brand}>
           <BrandLogo size="sm" className={styles.brandLogo} />
-          <p className={styles.brandTag}>Contrôle HACCP</p>
+          {title ? <p className={styles.brandName}>{title}</p> : null}
+          <p className={styles.brandTag}>{tagline}</p>
         </div>
         <nav className={styles.nav}>
-          {NAV.map(({ to, label, end, icon: Icon }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={end}
-              className={({ isActive }) => (isActive ? styles.navActive : styles.navLink)}
-            >
-              <Icon />
-              {label}
-            </NavLink>
-          ))}
+          {NAV_ITEMS.filter((item) => navVisible(session.dashboard?.nav ?? {}, item.key)).map(
+            (item) => {
+              const Icon = ICONS[item.key];
+              const to = item.path && slug ? `/${slug}/${item.path}` : slug ? `/${slug}` : "/";
+              return (
+                <NavLink
+                  key={item.key}
+                  to={to}
+                  end={!item.path}
+                  className={({ isActive }) => (isActive ? styles.navActive : styles.navLink)}
+                >
+                  <Icon />
+                  {item.label}
+                </NavLink>
+              );
+            }
+          )}
         </nav>
         <div className={styles.sidebarFoot}>
-          {org.organizationId ? (
-            <p className={styles.orgChip} title={org.organizationId}>
-              Org. {org.organizationId}
+          {session.isPlatformAdmin ? (
+            <NavLink to="/admin" className={styles.navLink}>
+              Tous les tableaux
+            </NavLink>
+          ) : null}
+          {slug ? (
+            <p className={styles.orgChip} title={session.organizationId ?? slug}>
+              {slug}
             </p>
           ) : null}
           <button type="button" className={styles.linkButton} onClick={() => signOutUser()}>
@@ -71,7 +89,7 @@ export function DashboardLayout() {
       </header>
 
       <main className={styles.main}>
-        <Outlet context={org} />
+        <Outlet context={session} />
       </main>
     </div>
   );
