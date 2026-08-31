@@ -11,6 +11,7 @@ import { BrandLogo } from "../components/BrandLogo";
 import { useAuth } from "../contexts/AuthContext";
 import { useDashboardProfile } from "../hooks/useDashboardSession";
 import {
+  DEFAULT_ACCENT,
   dashboardPublicUrl,
   isValidSlug,
   slugifyPrefix,
@@ -125,7 +126,7 @@ export function AdminPage() {
         name: name.trim() || prefix,
         organizationId: orgId,
         tagline: "Contrôle HACCP",
-        accent: "#c4a35a",
+        accent: DEFAULT_ACCENT,
         nav: {},
         createdAt: serverTimestamp(),
         createdBy: user?.uid ?? "",
@@ -190,6 +191,7 @@ export function AdminPage() {
         </div>
       </header>
 
+      <p className={styles.kicker}>Rustiq</p>
       <h1 className={styles.h1}>Tableaux de bord</h1>
       <p className={styles.meta}>
         Toi seul peux en créer. Chaque resto a un préfixe dans l’adresse, par exemple{" "}

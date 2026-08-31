@@ -3,7 +3,7 @@ import { useOutletContext } from "react-router-dom";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { useEquipment } from "../hooks/useEquipment";
 import { useOrgCollection } from "../hooks/useOrgCollection";
-import { NAV_ITEMS, type NavKey } from "../lib/dashboards";
+import { DEFAULT_ACCENT, NAV_ITEMS, resolveAccent, type NavKey } from "../lib/dashboards";
 import { formatDateTime } from "../lib/dates";
 import { getFirebaseFirestore } from "../lib/firebase";
 import { equipmentTypeLabel, scheduleTypeLabel, userRoleLabel } from "../lib/labels";
@@ -40,7 +40,7 @@ export function SettingsPage() {
   const schedules = useOrgCollection<Schedule>(organizationId, "temperatureSchedules");
   const [dashName, setDashName] = useState(dashboard?.name ?? "");
   const [tagline, setTagline] = useState(dashboard?.tagline ?? "Contrôle HACCP");
-  const [accent, setAccent] = useState(dashboard?.accent ?? "#c4a35a");
+  const [accent, setAccent] = useState(resolveAccent(dashboard?.accent ?? DEFAULT_ACCENT));
   const [nav, setNav] = useState(dashboard?.nav ?? {});
   const [savingLook, setSavingLook] = useState(false);
   const [lookMsg, setLookMsg] = useState<string | null>(null);
@@ -49,7 +49,7 @@ export function SettingsPage() {
     if (!dashboard) return;
     setDashName(dashboard.name);
     setTagline(dashboard.tagline);
-    setAccent(dashboard.accent);
+    setAccent(resolveAccent(dashboard.accent));
     setNav(dashboard.nav);
   }, [dashboard]);
 
@@ -66,7 +66,7 @@ export function SettingsPage() {
           organizationId,
           name: dashName.trim() || slug,
           tagline: tagline.trim() || "Contrôle HACCP",
-          accent: /^#[0-9a-fA-F]{6}$/.test(accent) ? accent : "#c4a35a",
+          accent: resolveAccent(accent),
           nav,
           updatedAt: serverTimestamp(),
         },
@@ -113,7 +113,7 @@ export function SettingsPage() {
               <input
                 className={styles.fieldInput}
                 type="color"
-                value={/^#[0-9a-fA-F]{6}$/.test(accent) ? accent : "#c4a35a"}
+                value={resolveAccent(accent)}
                 onChange={(e) => setAccent(e.target.value)}
               />
             </label>

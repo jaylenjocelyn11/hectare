@@ -4,14 +4,14 @@
   --bg-elevated: #101010;
   --surface: #161616;
   --surface-2: #1e1e1e;
-  --text: #f4eee3;
-  --muted: #9a917f;
-  --gold: #c4a35a;
-  --gold-soft: #e0c07a;
-  --gold-dim: rgba(196, 163, 90, 0.16);
-  --accent: #c4a35a;
-  --accent-hover: #d4b56e;
-  --border: rgba(196, 163, 90, 0.18);
+  --text: #e8eef0;
+  --muted: #8a9a9c;
+  --gold: #506868;
+  --gold-soft: #7a9c9c;
+  --gold-dim: rgba(80, 104, 104, 0.16);
+  --accent: #506868;
+  --accent-hover: #6a8888;
+  --border: rgba(80, 104, 104, 0.22);
   --danger: #e85c57;
   --ok: #5cbf70;
   --warn: #e0a33a;
@@ -42,8 +42,8 @@ body,
 body {
   margin: 0;
   background:
-    radial-gradient(1200px 600px at 12% -10%, rgba(196, 163, 90, 0.14), transparent 55%),
-    radial-gradient(900px 500px at 100% 0%, rgba(196, 163, 90, 0.07), transparent 50%),
+    radial-gradient(1200px 600px at 12% -10%, rgba(80, 104, 104, 0.18), transparent 55%),
+    radial-gradient(900px 500px at 100% 0%, rgba(80, 104, 104, 0.09), transparent 50%),
     var(--bg);
 }
 
@@ -78,7 +78,7 @@ button {
   border: none;
   border-radius: 999px;
   background: linear-gradient(135deg, var(--gold), var(--gold-soft));
-  color: #1a1408;
+  color: #f4fafa;
   font-weight: 600;
   letter-spacing: 0.04em;
 }

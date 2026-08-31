@@ -43,7 +43,7 @@ export function LoginPage() {
       <div className={styles.glow} aria-hidden />
       <div className={styles.card}>
         <BrandLogo size="lg" className={styles.logo} />
-        <p className={styles.subtitle}>Connecte-toi pour voir les données de l’iPad</p>
+        <p className={styles.subtitle}>Tableau de bord Rustiq — connexion</p>
         <form className={styles.form} onSubmit={onSubmit}>
           <label className={styles.label}>
             E-mail

@@ -62,7 +62,7 @@
 .brandLogo {
   width: 168px;
   height: auto;
-  filter: drop-shadow(0 0 18px rgba(196, 163, 90, 0.22));
+  filter: drop-shadow(0 0 18px color-mix(in srgb, var(--gold) 32%, transparent));
 }
 
 .brandTag {
@@ -95,10 +95,14 @@
 
 .navActive {
   color: var(--text);
-  background: linear-gradient(135deg, rgba(196, 163, 90, 0.18), rgba(196, 163, 90, 0.06));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--gold) 22%, transparent),
+    color-mix(in srgb, var(--gold) 8%, transparent)
+  );
   border-color: var(--border);
   font-weight: 600;
-  box-shadow: inset 0 0 0 1px rgba(196, 163, 90, 0.08);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold) 12%, transparent);
 }
 
 .navLink:hover {
@@ -129,7 +133,7 @@
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #1a1408;
+  color: #f4fafa;
   background: linear-gradient(135deg, var(--gold), var(--gold-soft));
   border-radius: 999px;
   padding: 0.28rem 0.7rem;
@@ -150,7 +154,7 @@
   padding: 1.35rem 1.5rem;
   border-radius: 20px;
   background:
-    linear-gradient(135deg, rgba(196, 163, 90, 0.14), rgba(20, 20, 20, 0.4)),
+    linear-gradient(135deg, color-mix(in srgb, var(--gold) 16%, transparent), rgba(20, 20, 20, 0.4)),
     var(--surface);
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
@@ -171,7 +175,7 @@
   font-size: clamp(2rem, 3vw, 2.7rem);
   font-weight: 600;
   letter-spacing: 0.01em;
-  background: linear-gradient(90deg, #fff7e8, var(--gold-soft));
+  background: linear-gradient(90deg, #eef4f4, var(--gold-soft));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -270,7 +274,7 @@
 .table td {
   text-align: left;
   padding: 0.75rem 0.9rem;
-  border-bottom: 1px solid rgba(196, 163, 90, 0.1);
+  border-bottom: 1px solid color-mix(in srgb, var(--gold) 12%, transparent);
   white-space: nowrap;
 }
 
@@ -317,7 +321,7 @@
 }
 
 .table tr:hover td {
-  background: rgba(196, 163, 90, 0.04);
+  background: color-mix(in srgb, var(--gold) 6%, transparent);
 }
 
 .table tr:last-child td {

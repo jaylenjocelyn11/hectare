@@ -5,6 +5,7 @@ import {
   defaultDashboard,
   isPlatformAdmin,
   parseDashboardNav,
+  resolveAccent,
   type DashboardConfig,
   type DashboardUserProfile,
 } from "../lib/dashboards";
@@ -140,7 +141,7 @@ export function useDashboardSession(user: User | null, urlSlug: string | undefin
             organizationId,
             name: asText(data.name, slug),
             tagline: asText(data.tagline, "Contrôle HACCP"),
-            accent: asText(data.accent, "#c4a35a"),
+            accent: resolveAccent(asText(data.accent)),
             nav: parseDashboardNav(data.nav),
             persisted: true,
           });

@@ -6,14 +6,14 @@ type BrandLogoProps = {
 const widths = { sm: 132, md: 180, lg: 280 };
 
 export function BrandLogo({ className, size = "md" }: BrandLogoProps) {
-  const src = `${import.meta.env.BASE_URL}hectare-logo.png`;
+  const src = `${import.meta.env.BASE_URL}rustiq-logo.png`;
   return (
     <img
       className={className}
       src={src}
-      alt="Hectare — Torréfacteur"
+      alt="Rustiq"
       width={widths[size]}
-      height={Math.round(widths[size] * 0.45)}
+      height={Math.round(widths[size] * 0.31)}
       decoding="async"
     />
   );

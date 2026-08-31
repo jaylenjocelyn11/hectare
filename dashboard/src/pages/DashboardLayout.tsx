@@ -12,7 +12,7 @@ import {
 } from "../components/NavIcons";
 import { useAuth } from "../contexts/AuthContext";
 import { useDashboardSession } from "../hooks/useDashboardSession";
-import { NAV_ITEMS, navVisible, themeFromAccent } from "../lib/dashboards";
+import { DEFAULT_ACCENT, NAV_ITEMS, navVisible, resolveAccent, themeFromAccent } from "../lib/dashboards";
 import styles from "./DashboardPage.module.css";
 
 const ICONS = {
@@ -31,7 +31,7 @@ export function DashboardLayout() {
   const { user, signOutUser } = useAuth();
   const session = useDashboardSession(user, orgSlug);
   const slug = session.slug;
-  const accent = session.dashboard?.accent || "#c4a35a";
+  const accent = resolveAccent(session.dashboard?.accent || DEFAULT_ACCENT);
   const tagline = session.dashboard?.tagline || "Contrôle HACCP";
   const title = session.dashboard?.name;
 

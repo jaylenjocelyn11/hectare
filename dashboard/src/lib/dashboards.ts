@@ -33,6 +33,16 @@ export type DashboardUserProfile = {
   platformAdmin: boolean;
 };
 
+/** Teal sampled from the Rustiq wordmark (#506868). */
+export const DEFAULT_ACCENT = "#506868";
+const LEGACY_GOLD = "#c4a35a";
+
+export function resolveAccent(accent?: string | null): string {
+  const raw = (accent || "").trim();
+  if (!raw || raw.toLowerCase() === LEGACY_GOLD) return DEFAULT_ACCENT;
+  return /^#[0-9a-fA-F]{6}$/.test(raw) ? raw : DEFAULT_ACCENT;
+}
+
 export function slugifyPrefix(value: string): string {
   return value
     .trim()
@@ -60,7 +70,7 @@ export function parseDashboardNav(value: unknown): DashboardNav {
   const rec = value as Record<string, unknown>;
   const nav: DashboardNav = {};
   for (const item of NAV_ITEMS) {
-    if (typeof rec[item.key] === "boolean") nav[item.key] = rec[item.key];
+    if (typeof rec[item.key] === "boolean") nav[item.key] = rec[item.key] as boolean;
   }
   return nav;
 }
@@ -88,20 +98,24 @@ export function defaultDashboard(partial: {
     organizationId: partial.organizationId,
     name: partial.name?.trim() || partial.slug,
     tagline: "Contrôle HACCP",
-    accent: "#c4a35a",
+    accent: DEFAULT_ACCENT,
     nav: {},
     persisted: partial.persisted ?? false,
   };
 }
 
 export function themeFromAccent(accent: string): Record<string, string> {
-  const color = /^#[0-9a-fA-F]{6}$/.test(accent) ? accent : "#c4a35a";
+  const color = resolveAccent(accent);
   const r = parseInt(color.slice(1, 3), 16);
   const g = parseInt(color.slice(3, 5), 16);
   const b = parseInt(color.slice(5, 7), 16);
+  const sr = Math.min(255, Math.round(r + (255 - r) * 0.32));
+  const sg = Math.min(255, Math.round(g + (255 - g) * 0.32));
+  const sb = Math.min(255, Math.round(b + (255 - b) * 0.32));
+  const soft = `#${sr.toString(16).padStart(2, "0")}${sg.toString(16).padStart(2, "0")}${sb.toString(16).padStart(2, "0")}`;
   return {
     "--gold": color,
-    "--gold-soft": color,
+    "--gold-soft": soft,
     "--accent": color,
     "--gold-dim": `rgba(${r}, ${g}, ${b}, 0.16)`,
     "--border": `rgba(${r}, ${g}, ${b}, 0.18)`,

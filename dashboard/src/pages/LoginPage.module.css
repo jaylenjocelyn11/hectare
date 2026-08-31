@@ -13,7 +13,7 @@
   width: 42rem;
   height: 42rem;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(196, 163, 90, 0.22), transparent 65%);
+  background: radial-gradient(circle, rgba(80, 104, 104, 0.28), transparent 65%);
   filter: blur(8px);
   pointer-events: none;
 }
@@ -35,7 +35,7 @@
   margin: 0 auto 0.35rem;
   width: min(280px, 80%);
   height: auto;
-  filter: drop-shadow(0 0 28px rgba(196, 163, 90, 0.28));
+  filter: drop-shadow(0 0 28px rgba(80, 104, 104, 0.35));
 }
 
 .subtitle {
@@ -82,8 +82,8 @@
   padding: 0.85rem 1rem;
   border: none;
   border-radius: 999px;
-  background: linear-gradient(135deg, #b8923f, #e0c07a);
-  color: #1a1408;
+  background: linear-gradient(135deg, #506868, #7a9c9c);
+  color: #f4fafa;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
