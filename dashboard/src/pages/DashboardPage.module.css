@@ -622,3 +622,87 @@
   font-size: 0.88rem;
 }
 
+.modeTabs {
+  display: flex;
+  gap: 0.4rem;
+  margin: 0 0 1.15rem;
+  padding: 0.3rem;
+  width: fit-content;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #0c0c0c;
+}
+
+.modeTab,
+.modeTabActive {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.modeTabActive {
+  color: #111;
+  background: linear-gradient(135deg, var(--gold), var(--gold-soft));
+}
+
+.roster {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-bottom: 1rem;
+}
+
+.rosterCard,
+.rosterMe {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.rosterMe {
+  border-color: var(--gold);
+  background: color-mix(in srgb, var(--gold) 12%, var(--surface));
+}
+
+.rosterTimes {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.mineDays {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+}
+
+.mineDay {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.7rem 0.8rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: #0c0c0c;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.mineDay strong {
+  color: var(--text);
+  font-size: 0.95rem;
+}
+

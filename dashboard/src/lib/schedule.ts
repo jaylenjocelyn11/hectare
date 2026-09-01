@@ -119,3 +119,23 @@ export function shiftHours(shift: ShiftDraft): number {
 export function weekHours(days: Record<WeekdayKey, ShiftDraft>): number {
   return WEEKDAYS.reduce((sum, day) => sum + shiftHours(days[day.key]), 0);
 }
+
+export function addDays(date: Date, days: number): Date {
+  const next = new Date(date);
+  next.setHours(0, 0, 0, 0);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+export function weekdayKeyFromDate(date = new Date()): WeekdayKey {
+  return WEEKDAYS[(date.getDay() + 6) % 7].key;
+}
+
+export function formatLongDay(date: Date): string {
+  const raw = new Intl.DateTimeFormat("fr-CA", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }).format(date);
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
+}

@@ -1,17 +1,20 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { doc, serverTimestamp, writeBatch } from "firebase/firestore";
 import { useOutletContext } from "react-router-dom";
 import { useOrgCollection } from "../hooks/useOrgCollection";
 import { getFirebaseFirestore } from "../lib/firebase";
 import {
+  addDays,
   addWeeks,
   emptyDays,
+  formatLongDay,
   formatWeekRange,
   formatWeekStart,
   mondayOf,
   parseDays,
   scheduleDocumentId,
   shiftHours,
+  weekdayKeyFromDate,
   weekHours,
   workingShift,
   WEEKDAYS,
@@ -44,6 +47,8 @@ type RowState = {
   note: string;
 };
 
+type ViewMode = "edit" | "mine" | "day";
+
 function formatHours(hours: number): string {
   if (!hours) return "0 h";
   const rounded = Math.round(hours * 10) / 10;
@@ -58,12 +63,28 @@ export function SchedulePage() {
   const [drafts, setDrafts] = useState<Record<string, RowState>>({});
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [view, setView] = useState<ViewMode>("edit");
+  const [dayDate, setDayDate] = useState(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  });
+  const [selfUserId, setSelfUserId] = useState("");
 
   const employees = useMemo(() => {
     return [...users.docs]
       .filter((u) => u.isActive !== false)
       .sort((a, b) => asText(a.name).localeCompare(asText(b.name), "fr"));
   }, [users.docs]);
+
+  useEffect(() => {
+    if (!organizationId) return;
+    const stored = localStorage.getItem(`hectare-schedule-self-${organizationId}`) || "";
+    const managers = employees.filter((u) => asText(u.role, "") === "manager");
+    const fallback = managers[0]?.id || employees[0]?.id || "";
+    const next = employees.some((u) => u.id === stored) ? stored : fallback;
+    setSelfUserId(next);
+  }, [organizationId, employees]);
 
   const rows = useMemo(() => {
     return employees.map((user) => {
@@ -175,15 +196,177 @@ export function SchedulePage() {
   }
 
   const teamHours = rows.reduce((sum, row) => sum + weekHours(row.days), 0);
+  const myRow = rows.find((row) => row.userId === selfUserId);
+  const dayKey = weekdayKeyFromDate(dayDate);
+  const dayWeekStart = formatWeekStart(mondayOf(dayDate));
+  const dayRows = useMemo(() => {
+    const sourceWeek = dayWeekStart === weekStart ? rows : employees.map((user) => {
+      const existing = schedules.docs.find((docRow) => {
+        const expectedId = scheduleDocumentId(user.id, dayWeekStart);
+        return (
+          docRow.id === expectedId ||
+          (docRow.weekStart === dayWeekStart &&
+            (docRow.userId === user.id || docRow.linkedId === user.id))
+        );
+      });
+      return {
+        userId: user.id,
+        userName: asText(user.name, "Employé"),
+        days: existing ? parseDays(existing.days) : emptyDays(),
+        note: typeof existing?.note === "string" ? existing.note : "",
+      } satisfies RowState;
+    });
+    return sourceWeek;
+  }, [dayWeekStart, weekStart, rows, employees, schedules.docs]);
+
+  const workingToday = dayRows
+    .map((row) => ({ row, shift: row.days[dayKey] }))
+    .filter((item) => !item.shift.off)
+    .sort((a, b) => a.shift.start.localeCompare(b.shift.start) || a.row.userName.localeCompare(b.row.userName, "fr"));
+  const offToday = dayRows.filter((row) => row.days[dayKey].off);
+
+  function chooseSelf(userId: string) {
+    setSelfUserId(userId);
+    if (organizationId) localStorage.setItem(`hectare-schedule-self-${organizationId}`, userId);
+  }
 
   return (
     <PageShell errors={[users.error, schedules.error]}>
       <h1 className={styles.h1}>Horaire</h1>
       <p className={styles.meta}>
-        Publie la semaine de chaque employé. L’app iPhone affiche uniquement l’horaire de la personne
-        connectée.
+        Publie les semaines, consulte la tienne, ou vois qui travaille aujourd’hui.
       </p>
 
+      <div className={styles.modeTabs} role="tablist" aria-label="Vue horaire">
+        {(
+          [
+            ["edit", "Édition"],
+            ["mine", "Mon horaire"],
+            ["day", "Journée"],
+          ] as const
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={view === key}
+            className={view === key ? styles.modeTabActive : styles.modeTab}
+            onClick={() => setView(key)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {view === "day" ? (
+        <>
+          <div className={styles.scheduleToolbar}>
+            <div className={styles.weekNav}>
+              <button type="button" className={styles.linkButton} onClick={() => setDayDate(addDays(dayDate, -1))}>
+                Jour préc.
+              </button>
+              <div>
+                <strong>{formatLongDay(dayDate)}</strong>
+                {dayDate.toDateString() === new Date().toDateString() ? (
+                  <div className={styles.hint}>Aujourd’hui</div>
+                ) : null}
+              </div>
+              <button type="button" className={styles.linkButton} onClick={() => setDayDate(addDays(dayDate, 1))}>
+                Jour suiv.
+              </button>
+            </div>
+          </div>
+          <div className={styles.kpis}>
+            <div className={styles.kpi}>
+              <span className={styles.kpiLabel}>En service</span>
+              <span className={styles.kpiValue}>{workingToday.length}</span>
+            </div>
+            <div className={styles.kpi}>
+              <span className={styles.kpiLabel}>Congé</span>
+              <span className={styles.kpiValue}>{offToday.length}</span>
+            </div>
+          </div>
+          {workingToday.length === 0 ? (
+            <p className="muted">Personne n’est prévu ce jour-là.</p>
+          ) : (
+            <div className={styles.roster}>
+              {workingToday.map(({ row, shift }) => (
+                <article
+                  key={row.userId}
+                  className={row.userId === selfUserId ? styles.rosterMe : styles.rosterCard}
+                >
+                  <div>
+                    <strong>{row.userName}</strong>
+                    {row.userId === selfUserId ? <span className={styles.tagOk}>Vous</span> : null}
+                    {shift.note ? <div className={styles.hint}>{shift.note}</div> : null}
+                  </div>
+                  <div className={styles.rosterTimes}>
+                    {shift.start} – {shift.end}
+                    <span className={styles.hint}>{formatHours(shiftHours(shift))}</span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+          {offToday.length > 0 ? (
+            <p className={styles.hint}>
+              En congé : {offToday.map((row) => row.userName).join(", ")}
+            </p>
+          ) : null}
+        </>
+      ) : null}
+
+      {view === "mine" ? (
+        <>
+          <label className={styles.filter}>
+            Je suis
+            <select value={selfUserId} onChange={(e) => chooseSelf(e.target.value)}>
+              {employees.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {asText(user.name, "Employé")}
+                </option>
+              ))}
+            </select>
+          </label>
+          {!myRow ? (
+            <p className="muted">Choisis ton nom pour voir ta semaine.</p>
+          ) : (
+            <article className={styles.scheduleCard}>
+              <header className={styles.cardHead}>
+                <div>
+                  <h2 className={styles.scheduleName}>{myRow.userName}</h2>
+                  <p className={styles.hint}>
+                    {formatWeekRange(weekStart)} · {formatHours(weekHours(myRow.days))}
+                  </p>
+                </div>
+              </header>
+              <div className={styles.mineDays}>
+                {WEEKDAYS.map((day) => {
+                  const shift = myRow.days[day.key];
+                  return (
+                    <div key={day.key} className={styles.mineDay}>
+                      <span>{day.label}</span>
+                      <strong>{shift.off ? "Congé" : `${shift.start} – ${shift.end}`}</strong>
+                    </div>
+                  );
+                })}
+              </div>
+              {myRow.note ? <p className={styles.hint}>{myRow.note}</p> : null}
+            </article>
+          )}
+          <div className={styles.weekNav} style={{ marginTop: "1rem" }}>
+            <button type="button" className={styles.linkButton} onClick={() => setWeekStart(addWeeks(weekStart, -1))}>
+              Semaine préc.
+            </button>
+            <button type="button" className={styles.linkButton} onClick={() => setWeekStart(addWeeks(weekStart, 1))}>
+              Semaine suiv.
+            </button>
+          </div>
+        </>
+      ) : null}
+
+      {view === "edit" ? (
+        <>
       <div className={styles.scheduleToolbar}>
         <div className={styles.weekNav}>
           <button type="button" className={styles.linkButton} onClick={() => setWeekStart(addWeeks(weekStart, -1))}>
@@ -300,6 +483,8 @@ export function SchedulePage() {
           ))}
         </div>
       )}
+        </>
+      ) : null}
     </PageShell>
   );
 }
