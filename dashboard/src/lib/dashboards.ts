@@ -60,9 +60,10 @@ export function isValidSlug(slug: string): boolean {
 
 export function isPlatformAdmin(user: User | null, profile: DashboardUserProfile | null): boolean {
   if (!user) return false;
-  if (profile?.platformAdmin) return true;
   const allow = (import.meta.env.VITE_PLATFORM_ADMIN_EMAIL || "").trim().toLowerCase();
-  return !!allow && (user.email || "").toLowerCase() === allow;
+  if (allow && (user.email || "").toLowerCase() === allow) return true;
+  if (profile?.platformAdmin === false) return false;
+  return !!profile?.platformAdmin;
 }
 
 export function parseDashboardNav(value: unknown): DashboardNav {

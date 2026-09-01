@@ -14,6 +14,8 @@ export function HomeRedirect() {
     );
   }
 
+  if (isPlatformAdmin) return <Navigate to="/admin" replace />;
+
   if (error) {
     return (
       <div className="centered">
@@ -21,8 +23,6 @@ export function HomeRedirect() {
       </div>
     );
   }
-
-  if (isPlatformAdmin) return <Navigate to="/admin" replace />;
   if (profile?.dashboardSlug) return <Navigate to={`/${profile.dashboardSlug}`} replace />;
   if (profile?.organizationId) return <Navigate to={`/${profile.organizationId}`} replace />;
 

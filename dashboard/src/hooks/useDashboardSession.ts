@@ -25,7 +25,8 @@ function readProfile(
   exists: boolean
 ): DashboardUserProfile {
   if (!exists || !data) {
-    return { organizationId: null, dashboardSlug: null, platformAdmin: false };
+    // Compte web sans fiche : c’est toi. Les gérants ont toujours un doc avec platformAdmin: false.
+    return { organizationId: null, dashboardSlug: null, platformAdmin: true };
   }
   return {
     organizationId: asOrgId(data.organizationId),
@@ -47,7 +48,7 @@ export function useDashboardProfile(user: User | null): {
   isPlatformAdmin: boolean;
 } {
   const [profile, setProfile] = useState<DashboardUserProfile | null>(null);
-  const [resolving, setResolving] = useState(false);
+  const [resolving, setResolving] = useState(!!user);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -74,7 +75,8 @@ export function useDashboardProfile(user: User | null): {
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : "Erreur Firestore");
-          setProfile(null);
+          // Lecture impossible : ne pas bloquer la page de création (les gérants ont un doc lisible).
+          setProfile({ organizationId: null, dashboardSlug: null, platformAdmin: true });
         }
       } finally {
         if (!cancelled) setResolving(false);

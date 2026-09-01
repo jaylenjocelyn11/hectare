@@ -72,7 +72,7 @@ export function AdminPage() {
 
   const canManage = isPlatformAdmin;
 
-  if (resolving || !listed) {
+  if (resolving) {
     return (
       <div className="centered">
         <p className="muted">Vérification des accès…</p>
