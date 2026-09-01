@@ -39,7 +39,6 @@ export function AdminPage() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [formOk, setFormOk] = useState<string | null>(null);
-  const [listed, setListed] = useState(false);
 
   useEffect(() => {
     if (resolving) return;
@@ -61,8 +60,6 @@ export function AdminPage() {
         setListError(null);
       } catch (e) {
         if (!cancelled) setListError(e instanceof Error ? e.message : "Lecture impossible");
-      } finally {
-        if (!cancelled) setListed(true);
       }
     })();
     return () => {
