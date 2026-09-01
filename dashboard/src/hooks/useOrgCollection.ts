@@ -19,6 +19,7 @@ const SMALL_COLLECTIONS = new Set([
   "temperatureSchedules",
   "recipes",
   "inventory",
+  "employeeSchedules",
 ]);
 
 const HEAVY_KEYS = new Set([

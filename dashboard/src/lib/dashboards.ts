@@ -9,6 +9,7 @@ export const NAV_ITEMS = [
   { key: "recipes", path: "recipes", label: "Recettes" },
   { key: "inventory", path: "inventory", label: "Inventaire" },
   { key: "groups", path: "groups", label: "Groupe" },
+  { key: "schedule", path: "horaire", label: "Horaire" },
   { key: "reports", path: "reports", label: "Rapports" },
   { key: "settings", path: "settings", label: "Paramètres" },
 ] as const;

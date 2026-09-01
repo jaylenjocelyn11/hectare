@@ -12,6 +12,7 @@ import { OverviewPage } from "./pages/OverviewPage";
 import { ProceduresPage } from "./pages/ProceduresPage";
 import { RecipesPage } from "./pages/RecipesPage";
 import { ReportsPage } from "./pages/ReportsPage";
+import { SchedulePage } from "./pages/SchedulePage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { TemperaturesPage } from "./pages/TemperaturesPage";
 
@@ -52,6 +53,7 @@ export default function App() {
               <Route path="recipes" element={<RecipesPage />} />
               <Route path="inventory" element={<InventoryPage />} />
               <Route path="groups" element={<GroupsPage />} />
+              <Route path="horaire" element={<SchedulePage />} />
               <Route path="reports" element={<ReportsPage />} />
               <Route path="settings" element={<SettingsPage />} />
             </Route>

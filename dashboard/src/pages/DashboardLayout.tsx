@@ -8,6 +8,7 @@ import {
   IconGear,
   IconPeople,
   IconReport,
+  IconSchedule,
   IconThermometer,
 } from "../components/NavIcons";
 import { useAuth } from "../contexts/AuthContext";
@@ -22,6 +23,7 @@ const ICONS = {
   recipes: IconBook,
   inventory: IconBox,
   groups: IconPeople,
+  schedule: IconSchedule,
   reports: IconReport,
   settings: IconGear,
 } as const;

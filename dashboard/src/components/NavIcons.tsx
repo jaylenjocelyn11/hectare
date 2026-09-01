@@ -84,6 +84,16 @@ export function IconReport(p: IconProps) {
   );
 }
 
+export function IconSchedule(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M8 3v4M16 3v4M3 11h18" />
+      <path d="M12 15h.01M8 15h.01M16 15h.01" />
+    </Svg>
+  );
+}
+
 export function IconGear(p: IconProps) {
   return (
     <Svg {...p}>

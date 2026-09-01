@@ -517,3 +517,108 @@
   color: var(--text);
 }
 
+.scheduleToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0 0 1.2rem;
+}
+
+.weekNav {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.scheduleActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.scheduleStack {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.scheduleCard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1rem 1.1rem 1.15rem;
+}
+
+.scheduleName {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 1.2rem;
+  color: var(--gold-soft);
+}
+
+.scheduleGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(132px, 1fr));
+  gap: 0.55rem;
+  overflow: auto;
+  margin: 0.85rem 0 1rem;
+}
+
+.dayCell {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.65rem 0.6rem;
+  background: #0c0c0c;
+  min-width: 132px;
+}
+
+.dayCellHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 0.45rem;
+}
+
+.offToggle {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.68rem;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.timeField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.65rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 0.4rem;
+}
+
+.timeField input {
+  padding: 0.35rem 0.4rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #111;
+  color: var(--text);
+}
+
+.restLabel {
+  margin: 0.4rem 0 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
