@@ -159,7 +159,7 @@ export function useDashboardSession(user: User | null, urlSlug: string | undefin
             : profile?.organizationId === slug
               ? profile.organizationId
               : admin
-                ? slug
+                ? profile?.organizationId || slug
                 : null;
 
         if (!fallbackOrg) {
@@ -171,7 +171,13 @@ export function useDashboardSession(user: User | null, urlSlug: string | undefin
         setDashboard(defaultDashboard({ slug, organizationId: fallbackOrg, persisted: false }));
         setDashError(null);
       } catch (e) {
-        if (!cancelled) {
+        if (cancelled) return;
+        // Collection dashboards souvent interdite : l’admin ouvre quand même l’org iPad.
+        const fallbackOrg = admin ? profile?.organizationId || slug : profile?.organizationId;
+        if (fallbackOrg && (admin || profile?.dashboardSlug === slug || profile?.organizationId === slug)) {
+          setDashboard(defaultDashboard({ slug, organizationId: fallbackOrg, persisted: false }));
+          setDashError(null);
+        } else {
           setDashError(e instanceof Error ? e.message : "Erreur Firestore");
           setDashboard(null);
         }

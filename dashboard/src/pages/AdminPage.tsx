@@ -26,11 +26,21 @@ type DashRow = {
   organizationId: string;
 };
 
+function withLinkedOrg(
+  rows: DashRow[],
+  profile: { organizationId: string | null; dashboardSlug: string | null } | null
+): DashRow[] {
+  const orgId = profile?.organizationId;
+  if (!orgId) return rows;
+  const slug = profile.dashboardSlug || orgId;
+  if (rows.some((r) => r.slug === slug || r.organizationId === orgId)) return rows;
+  return [{ slug, name: "Restaurant lié", organizationId: orgId }, ...rows];
+}
+
 export function AdminPage() {
   const { user, signOutUser } = useAuth();
   const { resolving, error, isPlatformAdmin, profile } = useDashboardProfile(user);
   const [rows, setRows] = useState<DashRow[]>([]);
-  const [listError, setListError] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [organizationId, setOrganizationId] = useState("");
@@ -47,25 +57,25 @@ export function AdminPage() {
       try {
         const snap = await getDocs(collection(getFirebaseFirestore(), "dashboards"));
         if (cancelled) return;
-        setRows(
-          snap.docs.map((d) => {
-            const data = d.data();
-            return {
-              slug: d.id,
-              name: asText(data.name, d.id),
-              organizationId: asOrgId(data.organizationId) || d.id,
-            };
-          })
-        );
-        setListError(null);
-      } catch (e) {
-        if (!cancelled) setListError(e instanceof Error ? e.message : "Lecture impossible");
+        const fromFs = snap.docs.map((d) => {
+          const data = d.data();
+          return {
+            slug: d.id,
+            name: asText(data.name, d.id),
+            organizationId: asOrgId(data.organizationId) || d.id,
+          };
+        });
+        setRows(withLinkedOrg(fromFs, profile));
+      } catch {
+        if (!cancelled) {
+          setRows(withLinkedOrg([], profile));
+        }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [resolving, formOk]);
+  }, [resolving, formOk, profile]);
 
   const canManage = isPlatformAdmin;
 
@@ -127,6 +137,7 @@ export function AdminPage() {
     setSaving(true);
     try {
       const db = getFirebaseFirestore();
+      let savedDashboard = false;
       try {
         await setDoc(doc(db, "dashboards", prefix), {
           slug: prefix,
@@ -139,38 +150,55 @@ export function AdminPage() {
           createdBy: user?.uid ?? "",
           createdByEmail: user?.email ?? "",
         });
+        savedDashboard = true;
       } catch {
-        // Collection dashboards parfois interdite par les règles ; le profil user suffit.
+        savedDashboard = false;
       }
 
       if (email) {
         const uid = await createOrgAuthUser(email, managerPassword);
-        await setDoc(
-          doc(db, "dashboardUsers", uid),
-          {
-            organizationId: orgId,
-            dashboardSlug: prefix,
-            email,
-            platformAdmin: false,
-            createdAt: serverTimestamp(),
-          },
-          { merge: true }
-        );
+        try {
+          await setDoc(
+            doc(db, "dashboardUsers", uid),
+            {
+              organizationId: orgId,
+              dashboardSlug: prefix,
+              email,
+              platformAdmin: false,
+              createdAt: serverTimestamp(),
+            },
+            { merge: true }
+          );
+        } catch {
+          setFormError(
+            "Compte créé, mais Firestore refuse d’écrire dashboardUsers. Publie les règles (fichier dashboard/firestore.rules) puis réessaie."
+          );
+          return;
+        }
       }
 
       if (user) {
-        await setDoc(
-          doc(db, "dashboardUsers", user.uid),
-          {
-            platformAdmin: true,
-            dashboardSlug: prefix,
-            ...(profile?.organizationId ? {} : { organizationId: orgId }),
-          },
-          { merge: true }
-        );
+        try {
+          await setDoc(
+            doc(db, "dashboardUsers", user.uid),
+            {
+              platformAdmin: true,
+              dashboardSlug: prefix,
+              organizationId: profile?.organizationId || orgId,
+            },
+            { merge: true }
+          );
+        } catch {
+          // Lecture de son propre profil reste possible ; le lien org iPad suffit.
+        }
       }
 
-      setFormOk(`Tableau de bord créé : ${dashboardPublicUrl(prefix)}`);
+      const openSlug = savedDashboard ? prefix : orgId;
+      setRows((prev) => {
+        if (prev.some((r) => r.slug === openSlug)) return prev;
+        return [...prev, { slug: openSlug, name: name.trim() || prefix, organizationId: orgId }];
+      });
+      setFormOk(`Tableau de bord prêt : ${dashboardPublicUrl(openSlug)}`);
       setName("");
       setSlug("");
       setOrganizationId("");
@@ -181,6 +209,10 @@ export function AdminPage() {
         err && typeof err === "object" && "code" in err ? String((err as { code: string }).code) : "";
       if (code === "auth/email-already-in-use") {
         setFormError("Cet e-mail a déjà un compte. Lie-le à la main dans dashboardUsers, ou choisis un autre e-mail.");
+      } else if (code === "permission-denied") {
+        setFormError(
+          "Firestore refuse l’écriture. Dans Firebase → Firestore (base hectarecafe) → Règles, publie le contenu de dashboard/firestore.rules."
+        );
       } else {
         setFormError(err instanceof Error ? err.message : "Création impossible");
       }
@@ -209,7 +241,14 @@ export function AdminPage() {
         {" "}(GitHub Pages n’accepte pas un sous-domaine du type hectare.github.io).
       </p>
       {error ? <p className={styles.warn}>{error}</p> : null}
-      {listError ? <p className={styles.warn}>{listError}</p> : null}
+
+      {profile?.organizationId ? (
+        <p className={styles.ok}>
+          <Link to={`/${profile.dashboardSlug || profile.organizationId}`}>
+            Ouvrir le tableau de bord ({profile.organizationId})
+          </Link>
+        </p>
+      ) : null}
 
       <h2 className={styles.h2}>Existants</h2>
       {rows.length === 0 ? (
