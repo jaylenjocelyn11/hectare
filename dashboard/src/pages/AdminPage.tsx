@@ -69,6 +69,15 @@ export function AdminPage() {
 
   const canManage = isPlatformAdmin;
 
+  useEffect(() => {
+    if (resolving || !canManage || !user) return;
+    void setDoc(
+      doc(getFirebaseFirestore(), "dashboardUsers", user.uid),
+      { platformAdmin: true },
+      { merge: true }
+    ).catch(() => {});
+  }, [resolving, canManage, user]);
+
   if (resolving) {
     return (
       <div className="centered">
@@ -118,17 +127,21 @@ export function AdminPage() {
     setSaving(true);
     try {
       const db = getFirebaseFirestore();
-      await setDoc(doc(db, "dashboards", prefix), {
-        slug: prefix,
-        name: name.trim() || prefix,
-        organizationId: orgId,
-        tagline: "Contrôle HACCP",
-        accent: DEFAULT_ACCENT,
-        nav: {},
-        createdAt: serverTimestamp(),
-        createdBy: user?.uid ?? "",
-        createdByEmail: user?.email ?? "",
-      });
+      try {
+        await setDoc(doc(db, "dashboards", prefix), {
+          slug: prefix,
+          name: name.trim() || prefix,
+          organizationId: orgId,
+          tagline: "Contrôle HACCP",
+          accent: DEFAULT_ACCENT,
+          nav: {},
+          createdAt: serverTimestamp(),
+          createdBy: user?.uid ?? "",
+          createdByEmail: user?.email ?? "",
+        });
+      } catch {
+        // Collection dashboards parfois interdite par les règles ; le profil user suffit.
+      }
 
       if (email) {
         const uid = await createOrgAuthUser(email, managerPassword);

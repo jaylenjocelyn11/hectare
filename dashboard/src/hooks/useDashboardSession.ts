@@ -25,14 +25,16 @@ function readProfile(
   exists: boolean
 ): DashboardUserProfile {
   if (!exists || !data) {
-    // Compte web sans fiche : c’est toi. Les gérants ont toujours un doc avec platformAdmin: false.
     return { organizationId: null, dashboardSlug: null, platformAdmin: true };
   }
+  const email = typeof data.email === "string" ? data.email : "";
+  // Gérant créé depuis l’admin : platformAdmin false + e-mail. Le compte iPad/web
+  // n’a souvent que organizationId, parfois avec false par erreur — ce n’est pas un gérant.
+  const isOrgManager = data.platformAdmin === false && email.includes("@");
   return {
     organizationId: asOrgId(data.organizationId),
     dashboardSlug: slugOrNull(data.dashboardSlug),
-    // Pas de champ = toi (le premier compte web). false = gérant d’un resto.
-    platformAdmin: data.platformAdmin !== false,
+    platformAdmin: !isOrgManager,
   };
 }
 
