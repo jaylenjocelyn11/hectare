@@ -82,11 +82,28 @@ export function navVisible(nav: DashboardNav, key: NavKey): boolean {
   return nav[key] !== false;
 }
 
+export const ROOT_DOMAIN = (import.meta.env.VITE_ROOT_DOMAIN || "restiq-app.ca").trim().toLowerCase();
+
+const BLOCKED_SUBDOMAINS = new Set(["www", "admin", "app", "mail", "api", "login", "ftp", "staging"]);
+
+export function tenantSlugFromHost(hostname?: string): string | null {
+  const host = (hostname || (typeof window !== "undefined" ? window.location.hostname : ""))
+    .toLowerCase()
+    .replace(/\.$/, "");
+  if (!host || host === ROOT_DOMAIN || host === `www.${ROOT_DOMAIN}`) return null;
+  if (!host.endsWith(`.${ROOT_DOMAIN}`)) return null;
+  const sub = host.slice(0, -(ROOT_DOMAIN.length + 1));
+  if (!sub || sub.includes(".") || BLOCKED_SUBDOMAINS.has(sub)) return null;
+  return isValidSlug(sub) ? sub : null;
+}
+
+export function apexOrigin(): string {
+  return `https://${ROOT_DOMAIN}`;
+}
+
+/** Adresse publique : https://hectare.restiq-app.ca */
 export function dashboardPublicUrl(slug: string): string {
-  if (typeof window === "undefined") return `#/${slug}`;
-  const base = import.meta.env.BASE_URL || "/";
-  const path = `${window.location.origin}${base}`.replace(/\/+$/, "/");
-  return `${path}#/${slug}`;
+  return `https://${slugifyPrefix(slug)}.${ROOT_DOMAIN}`;
 }
 
 export function defaultDashboard(partial: {

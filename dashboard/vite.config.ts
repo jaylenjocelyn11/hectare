@@ -3,6 +3,6 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
-  // Sur GitHub Pages l’adresse est …github.io/NOM-DU-REPO/  → on met ce préfixe via VITE_BASE_PATH
-  base: process.env.VITE_BASE_PATH || "/",
+  // Site servi à la racine de restiq-app.ca (et des sous-domaines hectare.restiq-app.ca).
+  base: "/",
 });

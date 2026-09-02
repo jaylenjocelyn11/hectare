@@ -1,6 +1,7 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useDashboardProfile } from "../hooks/useDashboardSession";
+import { ROOT_DOMAIN, dashboardPublicUrl } from "../lib/dashboards";
 
 export function HomeRedirect() {
   const { user } = useAuth();
@@ -23,8 +24,20 @@ export function HomeRedirect() {
       </div>
     );
   }
-  if (profile?.dashboardSlug) return <Navigate to={`/${profile.dashboardSlug}`} replace />;
-  if (profile?.organizationId) return <Navigate to={`/${profile.organizationId}`} replace />;
+
+  const slug = profile?.dashboardSlug || profile?.organizationId;
+  if (slug) {
+    const host = window.location.hostname.toLowerCase();
+    if (host === ROOT_DOMAIN || host === `www.${ROOT_DOMAIN}`) {
+      window.location.replace(dashboardPublicUrl(slug));
+      return (
+        <div className="centered">
+          <p className="muted">Ouverture de {dashboardPublicUrl(slug)}…</p>
+        </div>
+      );
+    }
+    return <Navigate to={`/${slug}`} replace />;
+  }
 
   return (
     <div className="centered">

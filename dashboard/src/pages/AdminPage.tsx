@@ -236,17 +236,17 @@ export function AdminPage() {
       <p className={styles.kicker}>Rustiq</p>
       <h1 className={styles.h1}>Tableaux de bord</h1>
       <p className={styles.meta}>
-        Toi seul peux en créer. Chaque resto a un préfixe dans l’adresse, par exemple{" "}
-        <code className={styles.inlineCode}>{dashboardPublicUrl("hectare-cafe")}</code>
-        {" "}(GitHub Pages n’accepte pas un sous-domaine du type hectare.github.io).
+        Toi seul peux en créer. Chaque resto a son préfixe en sous-domaine, par exemple{" "}
+        <code className={styles.inlineCode}>{dashboardPublicUrl("hectare")}</code>
+        .
       </p>
       {error ? <p className={styles.warn}>{error}</p> : null}
 
       {profile?.organizationId ? (
         <p className={styles.ok}>
-          <Link to={`/${profile.dashboardSlug || profile.organizationId}`}>
+          <a href={dashboardPublicUrl(profile.dashboardSlug || profile.organizationId)}>
             Ouvrir le tableau de bord ({profile.organizationId})
-          </Link>
+          </a>
         </p>
       ) : null}
 
@@ -273,7 +273,7 @@ export function AdminPage() {
                   </td>
                   <td>{row.organizationId}</td>
                   <td>
-                    <Link to={`/${row.slug}`}>Ouvrir</Link>
+                    <a href={dashboardPublicUrl(row.slug)}>Ouvrir</a>
                   </td>
                 </tr>
               ))}

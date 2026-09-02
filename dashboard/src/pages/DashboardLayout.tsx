@@ -13,7 +13,15 @@ import {
 } from "../components/NavIcons";
 import { useAuth } from "../contexts/AuthContext";
 import { useDashboardSession } from "../hooks/useDashboardSession";
-import { DEFAULT_ACCENT, NAV_ITEMS, navVisible, resolveAccent, themeFromAccent } from "../lib/dashboards";
+import {
+  DEFAULT_ACCENT,
+  NAV_ITEMS,
+  apexOrigin,
+  navVisible,
+  resolveAccent,
+  tenantSlugFromHost,
+  themeFromAccent,
+} from "../lib/dashboards";
 import styles from "./DashboardPage.module.css";
 
 const ICONS = {
@@ -29,10 +37,12 @@ const ICONS = {
 } as const;
 
 export function DashboardLayout() {
+  const hostSlug = tenantSlugFromHost();
   const { orgSlug } = useParams();
   const { user, signOutUser } = useAuth();
-  const session = useDashboardSession(user, orgSlug);
+  const session = useDashboardSession(user, hostSlug || orgSlug);
   const slug = session.slug;
+  const root = hostSlug ? "" : slug ? `/${slug}` : "";
   const accent = resolveAccent(session.dashboard?.accent || DEFAULT_ACCENT);
   const tagline = session.dashboard?.tagline || "Contrôle HACCP";
   const title = session.dashboard?.name;
@@ -49,7 +59,7 @@ export function DashboardLayout() {
           {NAV_ITEMS.filter((item) => navVisible(session.dashboard?.nav ?? {}, item.key)).map(
             (item) => {
               const Icon = ICONS[item.key];
-              const to = item.path && slug ? `/${slug}/${item.path}` : slug ? `/${slug}` : "/";
+              const to = item.path ? `${root}/${item.path}` : root || "/";
               return (
                 <NavLink
                   key={item.key}
@@ -66,9 +76,15 @@ export function DashboardLayout() {
         </nav>
         <div className={styles.sidebarFoot}>
           {session.isPlatformAdmin ? (
-            <NavLink to="/admin" className={styles.navLink}>
-              Tous les tableaux
-            </NavLink>
+            hostSlug ? (
+              <a href={`${apexOrigin()}/admin`} className={styles.navLink}>
+                Tous les tableaux
+              </a>
+            ) : (
+              <NavLink to="/admin" className={styles.navLink}>
+                Tous les tableaux
+              </NavLink>
+            )
           ) : null}
           {slug ? (
             <p className={styles.orgChip} title={session.organizationId ?? slug}>
