@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import {
   collection,
   doc,
+  getDoc,
   getDocs,
   serverTimestamp,
   setDoc,
@@ -15,6 +16,7 @@ import {
   dashboardPublicUrl,
   isValidSlug,
   slugifyPrefix,
+  uniquePrefix,
 } from "../lib/dashboards";
 import { createOrgAuthUser, getFirebaseFirestore } from "../lib/firebase";
 import { asOrgId, asText } from "../lib/text";
@@ -116,10 +118,23 @@ export function AdminPage() {
     setFormError(null);
     setFormOk(null);
 
-    const prefix = slugifyPrefix(slug || name);
+    const taken = [...rows.map((r) => r.slug)];
+    let prefix = uniquePrefix(slug || name, taken);
     if (!isValidSlug(prefix)) {
-      setFormError("Le préfixe d’URL doit contenir 2 à 40 lettres, chiffres ou tirets (ex. hectare-cafe).");
+      setFormError("Le préfixe d’URL doit contenir 2 à 40 lettres, chiffres ou tirets (ex. hectare).");
       return;
+    }
+
+    const db = getFirebaseFirestore();
+    try {
+      for (let i = 0; i < 50; i++) {
+        const exists = await getDoc(doc(db, "dashboards", prefix));
+        if (!exists.exists()) break;
+        taken.push(prefix);
+        prefix = uniquePrefix(slug || name, taken);
+      }
+    } catch {
+      // Liste Firestore parfois illisible ; on garde le préfixe calculé.
     }
 
     const orgId = (organizationId.trim() || prefix).replace(/^\/+|\/+$/g, "");
@@ -136,7 +151,6 @@ export function AdminPage() {
 
     setSaving(true);
     try {
-      const db = getFirebaseFirestore();
       let savedDashboard = false;
       try {
         await setDoc(doc(db, "dashboards", prefix), {
@@ -181,11 +195,7 @@ export function AdminPage() {
         try {
           await setDoc(
             doc(db, "dashboardUsers", user.uid),
-            {
-              platformAdmin: true,
-              dashboardSlug: prefix,
-              organizationId: profile?.organizationId || orgId,
-            },
+            { platformAdmin: true },
             { merge: true }
           );
         } catch {
@@ -236,9 +246,10 @@ export function AdminPage() {
       <p className={styles.kicker}>Rustiq</p>
       <h1 className={styles.h1}>Tableaux de bord</h1>
       <p className={styles.meta}>
-        Toi seul peux en créer. Chaque resto a son préfixe en sous-domaine, par exemple{" "}
+        Toi seul peux en créer. Chaque resto reçoit un préfixe unique : Hectare →{" "}
         <code className={styles.inlineCode}>{dashboardPublicUrl("hectare")}</code>
-        .
+        , un autre resto → <code className={styles.inlineCode}>{dashboardPublicUrl("bistro")}</code>
+        . Le DNS joker <code className={styles.inlineCode}>*</code> couvre tous les nouveaux préfixes, tu n’ajoutes rien à IONOS.
       </p>
       {error ? <p className={styles.warn}>{error}</p> : null}
 
@@ -307,7 +318,10 @@ export function AdminPage() {
             required
           />
         </label>
-        <p className={styles.hint}>Adresse : {slug ? dashboardPublicUrl(slugifyPrefix(slug)) : "—"}</p>
+        <p className={styles.hint}>
+          Adresse : {slug ? dashboardPublicUrl(slugifyPrefix(slug)) : "—"}. Si le préfixe existe déjà,
+          un numéro est ajouté (hectare-2, hectare-3…).
+        </p>
         <label className={styles.field}>
           ID organisation Firestore (iPad)
           <input

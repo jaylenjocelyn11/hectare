@@ -59,6 +59,18 @@ export function isValidSlug(slug: string): boolean {
   return /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/.test(slug) && !RESERVED_SLUGS.has(slug);
 }
 
+export function uniquePrefix(desired: string, taken: Iterable<string>): string {
+  let base = slugifyPrefix(desired);
+  if (!isValidSlug(base)) base = "resto";
+  const used = new Set([...taken].map((s) => slugifyPrefix(s)));
+  if (!used.has(base) && isValidSlug(base)) return base;
+  for (let n = 2; n < 1000; n++) {
+    const candidate = slugifyPrefix(`${base}-${n}`);
+    if (isValidSlug(candidate) && !used.has(candidate)) return candidate;
+  }
+  return slugifyPrefix(`${base}-${Date.now().toString(36)}`);
+}
+
 export function isPlatformAdmin(user: User | null, profile: DashboardUserProfile | null): boolean {
   if (!user) return false;
   const allow = (import.meta.env.VITE_PLATFORM_ADMIN_EMAIL || "").trim().toLowerCase();
