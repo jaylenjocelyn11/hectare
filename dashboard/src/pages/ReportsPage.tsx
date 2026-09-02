@@ -1,9 +1,17 @@
-import { useMemo, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import { useOutletContext } from "react-router-dom";
+import {
+  DeleteControl,
+  GhostButton,
+  ManageNotice,
+  RowActions,
+  useManageState,
+} from "../components/ManageControls";
 import { useEquipment } from "../hooks/useEquipment";
 import { useOrgCollection } from "../hooks/useOrgCollection";
 import { asDate, formatDateTime } from "../lib/dates";
 import { noteCategoryLabel } from "../lib/labels";
+import { createOrgDoc, patchOrgDoc, writeMessage } from "../lib/orgWrite";
 import { asNumber, asText, namedFromDocs } from "../lib/text";
 import type { OrgContext } from "./orgContext";
 import { PageShell } from "./PageShell";
@@ -62,6 +70,13 @@ function inPeriod(value: unknown, period: Period): boolean {
 export function ReportsPage() {
   const { organizationId } = useOutletContext<OrgContext>();
   const [period, setPeriod] = useState<Period>("week");
+  const manage = useManageState();
+  const [noteTitle, setNoteTitle] = useState("");
+  const [noteContent, setNoteContent] = useState("");
+  const [noteCategory, setNoteCategory] = useState("general");
+  const [noteImportant, setNoteImportant] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editContent, setEditContent] = useState("");
   const equipment = useEquipment(organizationId);
   const readings = useOrgCollection<TempReading>(organizationId, "tempReadings");
   const templates = useOrgCollection<ProcedureTemplate>(organizationId, "procedureTemplates");
@@ -96,6 +111,48 @@ export function ReportsPage() {
 
   const equipmentName = (id?: unknown) => namedFromDocs(equipment.lookup, id, "—");
   const templateName = (id?: unknown) => namedFromDocs(templates.docs, id, "Procédure");
+
+  async function addNote(e: FormEvent) {
+    e.preventDefault();
+    if (!organizationId || !noteTitle.trim()) return;
+    manage.setBusyId("create");
+    try {
+      await createOrgDoc(organizationId, "notes", {
+        title: noteTitle.trim(),
+        content: noteContent.trim(),
+        category: noteCategory,
+        isImportant: noteImportant,
+        authorName: "Manager",
+        isReadByManager: true,
+      });
+      setNoteTitle("");
+      setNoteContent("");
+      setNoteImportant(false);
+      manage.setCreating(false);
+      manage.setOk("Note enregistrée.");
+    } catch (err) {
+      manage.setError(writeMessage(err));
+    } finally {
+      manage.setBusyId(null);
+    }
+  }
+
+  async function saveNote(id: string) {
+    if (!organizationId) return;
+    manage.setBusyId(id);
+    try {
+      await patchOrgDoc(organizationId, "notes", id, {
+        title: editTitle.trim(),
+        content: editContent.trim(),
+      });
+      manage.setEditingId(null);
+      manage.setOk("Note mise à jour.");
+    } catch (err) {
+      manage.setError(writeMessage(err));
+    } finally {
+      manage.setBusyId(null);
+    }
+  }
 
   return (
     <PageShell
@@ -144,6 +201,63 @@ export function ReportsPage() {
       </div>
 
       <h2 className={styles.h2}>Notes</h2>
+      {organizationId ? (
+        <>
+          <GhostButton onClick={() => manage.setCreating((v) => !v)}>
+            {manage.creating ? "Fermer" : "Nouvelle note"}
+          </GhostButton>
+          <ManageNotice error={manage.error} ok={manage.ok} />
+          {manage.creating ? (
+            <form className={styles.manageForm} onSubmit={addNote}>
+              <label className={styles.field}>
+                Titre
+                <input
+                  className={styles.fieldInput}
+                  value={noteTitle}
+                  onChange={(e) => setNoteTitle(e.target.value)}
+                  required
+                />
+              </label>
+              <label className={styles.field}>
+                Catégorie
+                <select
+                  className={styles.fieldInput}
+                  value={noteCategory}
+                  onChange={(e) => setNoteCategory(e.target.value)}
+                >
+                  <option value="general">Général</option>
+                  <option value="maintenance">Maintenance</option>
+                  <option value="inventory">Inventaire</option>
+                  <option value="procedure">Procédure</option>
+                  <option value="temperature">Température</option>
+                  <option value="other">Autre</option>
+                </select>
+              </label>
+              <label className={styles.field}>
+                Contenu
+                <input
+                  className={styles.fieldInput}
+                  value={noteContent}
+                  onChange={(e) => setNoteContent(e.target.value)}
+                />
+              </label>
+              <label className={styles.checkInline}>
+                <input
+                  type="checkbox"
+                  checked={noteImportant}
+                  onChange={(e) => setNoteImportant(e.target.checked)}
+                />
+                Importante
+              </label>
+              <div className={styles.manageActions}>
+                <button className="btnGold" type="submit" disabled={manage.busyId === "create"}>
+                  Enregistrer
+                </button>
+              </div>
+            </form>
+          ) : null}
+        </>
+      ) : null}
       {periodNotes.length === 0 ? (
         <p className="muted">Aucune note sur cette période.</p>
       ) : (
@@ -155,6 +269,7 @@ export function ReportsPage() {
                 <th>Titre</th>
                 <th>Catégorie</th>
                 <th>Auteur</th>
+                <th>Gestion</th>
               </tr>
             </thead>
             <tbody>
@@ -162,14 +277,54 @@ export function ReportsPage() {
                 <tr key={n.id}>
                   <td>{formatDateTime(n.createdAt)}</td>
                   <td className={styles.wrap}>
+                    {manage.editingId === n.id ? (
+                      <>
+                        <input className={styles.fieldInput} value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
+                        <input className={styles.fieldInput} value={editContent} onChange={(e) => setEditContent(e.target.value)} />
+                      </>
+                    ) : (
+                      <>
                     {asText(n.title)}
                     {n.isImportant ? <span className={styles.tagWarn}> Important</span> : null}
                     {asText(n.content, "") ? (
                       <div className="muted">{asText(n.content)}</div>
                     ) : null}
+                      </>
+                    )}
                   </td>
                   <td>{noteCategoryLabel(n.category)}</td>
                   <td>{asText(n.authorName)}</td>
+                  <td>
+                    {organizationId ? (
+                      <RowActions>
+                        {manage.editingId === n.id ? (
+                          <>
+                            <GhostButton onClick={() => void saveNote(n.id)}>Sauver</GhostButton>
+                            <GhostButton onClick={() => manage.setEditingId(null)}>Annuler</GhostButton>
+                          </>
+                        ) : (
+                          <GhostButton
+                            onClick={() => {
+                              manage.setEditingId(n.id);
+                              setEditTitle(asText(n.title, ""));
+                              setEditContent(asText(n.content, "") === "—" ? "" : asText(n.content, ""));
+                            }}
+                          >
+                            Modifier
+                          </GhostButton>
+                        )}
+                        <DeleteControl
+                          organizationId={organizationId}
+                          collectionName="notes"
+                          id={n.id}
+                          label="cette note"
+                          busy={manage.busy(n.id)}
+                          onBusy={manage.setBusyId}
+                          onError={manage.setError}
+                        />
+                      </RowActions>
+                    ) : null}
+                  </td>
                 </tr>
               ))}
             </tbody>

@@ -706,3 +706,66 @@
   font-size: 0.95rem;
 }
 
+.rowActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.dangerButton {
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--danger) 55%, var(--border));
+  color: var(--danger);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.4rem 0.65rem;
+  border-radius: 999px;
+}
+
+.dangerButton:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+}
+
+.dangerButton:disabled,
+.linkButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.manageForm {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.7rem 0.9rem;
+  margin: 0.85rem 0 1.1rem;
+  padding: 1rem;
+  border: 1px dashed var(--border);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--gold) 6%, var(--surface));
+}
+
+.manageForm .field {
+  margin: 0;
+}
+
+.manageForm .fieldInput,
+.manageForm select {
+  width: 100%;
+}
+
+.manageActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  grid-column: 1 / -1;
+}
+
+.checkInline {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+

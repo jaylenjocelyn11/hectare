@@ -1,12 +1,26 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
+import {
+  DeleteControl,
+  GhostButton,
+  ManageNotice,
+  RowActions,
+  useManageState,
+} from "../components/ManageControls";
 import { useEquipment } from "../hooks/useEquipment";
 import { useOrgCollection } from "../hooks/useOrgCollection";
 import { DEFAULT_ACCENT, NAV_ITEMS, resolveAccent, type NavKey } from "../lib/dashboards";
 import { formatDateTime } from "../lib/dates";
 import { getFirebaseFirestore } from "../lib/firebase";
 import { equipmentTypeLabel, scheduleTypeLabel, userRoleLabel } from "../lib/labels";
+import {
+  createOrgDoc,
+  patchEquipment,
+  patchOrgDoc,
+  removeEquipment,
+  writeMessage,
+} from "../lib/orgWrite";
 import { asDisplayName, asNumber, asText } from "../lib/text";
 import type { OrgContext } from "./orgContext";
 import { PageShell } from "./PageShell";
@@ -44,6 +58,18 @@ export function SettingsPage() {
   const [nav, setNav] = useState(dashboard?.nav ?? {});
   const [savingLook, setSavingLook] = useState(false);
   const [lookMsg, setLookMsg] = useState<string | null>(null);
+  const manage = useManageState();
+  const [userName, setUserName] = useState("");
+  const [userRole, setUserRole] = useState("employee");
+  const [userPin, setUserPin] = useState("");
+  const [eqName, setEqName] = useState("");
+  const [eqKind, setEqKind] = useState("cold");
+  const [eqMin, setEqMin] = useState("0");
+  const [eqMax, setEqMax] = useState("4");
+  const [schedName, setSchedName] = useState("");
+  const [schedType, setSchedType] = useState("morning");
+  const [schedHour, setSchedHour] = useState("8");
+  const [schedMinute, setSchedMinute] = useState("0");
 
   useEffect(() => {
     if (!dashboard) return;
@@ -80,13 +106,87 @@ export function SettingsPage() {
     }
   }
 
+  async function addUser(e: FormEvent) {
+    e.preventDefault();
+    if (!organizationId || !userName.trim()) return;
+    manage.setBusyId("user");
+    try {
+      await createOrgDoc(organizationId, "users", {
+        name: userName.trim(),
+        role: userRole,
+        ...(userPin.trim() ? { pin: userPin.trim() } : {}),
+        isActive: true,
+        fcmTokens: [],
+      });
+      setUserName("");
+      setUserPin("");
+      manage.setOk("Utilisateur créé (PIN pour l’iPad).");
+    } catch (err) {
+      manage.setError(writeMessage(err));
+    } finally {
+      manage.setBusyId(null);
+    }
+  }
+
+  async function addEquipment(e: FormEvent) {
+    e.preventDefault();
+    if (!organizationId || !eqName.trim()) return;
+    manage.setBusyId("eq");
+    try {
+      await createOrgDoc(organizationId, "equipment", {
+        name: eqName.trim(),
+        type: eqName.trim(),
+        kind: eqKind,
+        isActive: true,
+        minTemperature: Number(eqMin),
+        maxTemperature: Number(eqMax),
+        temperatureUnit: "°C",
+        correctiveActions: [],
+      });
+      setEqName("");
+      manage.setOk("Équipement ajouté.");
+    } catch (err) {
+      manage.setError(writeMessage(err));
+    } finally {
+      manage.setBusyId(null);
+    }
+  }
+
+  async function addSchedule(e: FormEvent) {
+    e.preventDefault();
+    if (!organizationId || !schedName.trim()) return;
+    manage.setBusyId("sched");
+    try {
+      await createOrgDoc(organizationId, "temperatureSchedules", {
+        name: schedName.trim(),
+        scheduleDescription: "",
+        type: schedType,
+        isActive: true,
+        isOverdue: false,
+        isTimeWindowActive: true,
+        targetHour: Number(schedHour) || 8,
+        targetMinute: Number(schedMinute) || 0,
+        toleranceMinutes: 30,
+        equipmentIds: [],
+        temperaturePoints: [],
+      });
+      setSchedName("");
+      manage.setOk("Horaire de relevé ajouté.");
+    } catch (err) {
+      manage.setError(writeMessage(err));
+    } finally {
+      manage.setBusyId(null);
+    }
+  }
+
   return (
     <PageShell errors={[users.error, equipment.error, schedules.error]}>
       <h1 className={styles.h1}>Paramètres</h1>
       <p className={styles.meta}>
-        Utilisateurs, équipements et horaires de relevé. Consultation seulement — les PIN et mots de
-        passe ne s’affichent pas ici. Organisation : {organizationId}
+        Gère utilisateurs, équipements et horaires. Les PIN existants ne s’affichent pas. Organisation :{" "}
+        {organizationId}
       </p>
+      <ManageNotice error={manage.error} ok={manage.ok} />
 
       {slug && (dashboard?.persisted || session.isPlatformAdmin) ? (
         <>
@@ -143,6 +243,30 @@ export function SettingsPage() {
       ) : null}
 
       <h2 className={styles.h2}>Utilisateurs</h2>
+      {organizationId ? (
+        <form className={styles.manageForm} onSubmit={addUser}>
+          <label className={styles.field}>
+            Nom
+            <input className={styles.fieldInput} value={userName} onChange={(e) => setUserName(e.target.value)} required />
+          </label>
+          <label className={styles.field}>
+            Rôle
+            <select className={styles.fieldInput} value={userRole} onChange={(e) => setUserRole(e.target.value)}>
+              <option value="employee">Employé</option>
+              <option value="manager">Manager</option>
+            </select>
+          </label>
+          <label className={styles.field}>
+            PIN iPad
+            <input className={styles.fieldInput} value={userPin} onChange={(e) => setUserPin(e.target.value)} />
+          </label>
+          <div className={styles.manageActions}>
+            <button className="btnGold" type="submit" disabled={manage.busyId === "user"}>
+              Ajouter
+            </button>
+          </div>
+        </form>
+      ) : null}
       {users.loading ? <p className="muted">Chargement…</p> : null}
       {users.docs.length === 0 ? (
         <p className="muted">Aucun utilisateur.</p>
@@ -155,6 +279,7 @@ export function SettingsPage() {
                 <th>Rôle</th>
                 <th>Actif</th>
                 <th>Créé le</th>
+                <th>Gestion</th>
               </tr>
             </thead>
             <tbody>
@@ -172,6 +297,37 @@ export function SettingsPage() {
                       )}
                     </td>
                     <td>{formatDateTime(u.createdAt)}</td>
+                    <td>
+                      {organizationId ? (
+                        <RowActions>
+                          <GhostButton
+                            onClick={async () => {
+                              manage.setBusyId(u.id);
+                              try {
+                                await patchOrgDoc(organizationId, "users", u.id, {
+                                  isActive: u.isActive === false,
+                                });
+                              } catch (err) {
+                                manage.setError(writeMessage(err));
+                              } finally {
+                                manage.setBusyId(null);
+                              }
+                            }}
+                          >
+                            {u.isActive === false ? "Activer" : "Désactiver"}
+                          </GhostButton>
+                          <DeleteControl
+                            organizationId={organizationId}
+                            collectionName="users"
+                            id={u.id}
+                            label="cet utilisateur"
+                            busy={manage.busy(u.id)}
+                            onBusy={manage.setBusyId}
+                            onError={manage.setError}
+                          />
+                        </RowActions>
+                      ) : null}
+                    </td>
                   </tr>
                 ))}
             </tbody>
@@ -180,6 +336,37 @@ export function SettingsPage() {
       )}
 
       <h2 className={styles.h2}>Équipements</h2>
+      {organizationId ? (
+        <form className={styles.manageForm} onSubmit={addEquipment}>
+          <label className={styles.field}>
+            Nom
+            <input className={styles.fieldInput} value={eqName} onChange={(e) => setEqName(e.target.value)} required />
+          </label>
+          <label className={styles.field}>
+            Type
+            <select className={styles.fieldInput} value={eqKind} onChange={(e) => setEqKind(e.target.value)}>
+              <option value="cold">Froid</option>
+              <option value="hot">Chaud</option>
+              <option value="ambient">Ambiance</option>
+              <option value="freezer">Congélateur</option>
+              <option value="refrigerator">Réfrigérateur</option>
+            </select>
+          </label>
+          <label className={styles.field}>
+            Min °C
+            <input className={styles.fieldInput} value={eqMin} onChange={(e) => setEqMin(e.target.value)} />
+          </label>
+          <label className={styles.field}>
+            Max °C
+            <input className={styles.fieldInput} value={eqMax} onChange={(e) => setEqMax(e.target.value)} />
+          </label>
+          <div className={styles.manageActions}>
+            <button className="btnGold" type="submit" disabled={manage.busyId === "eq"}>
+              Ajouter
+            </button>
+          </div>
+        </form>
+      ) : null}
       {equipment.list.length === 0 ? (
         <p className="muted">Aucun équipement.</p>
       ) : (
@@ -191,6 +378,7 @@ export function SettingsPage() {
                 <th>Type</th>
                 <th>Plage</th>
                 <th>Actif</th>
+                <th>Gestion</th>
               </tr>
             </thead>
             <tbody>
@@ -212,6 +400,44 @@ export function SettingsPage() {
                         <span className={styles.tagOk}>Oui</span>
                       )}
                     </td>
+                    <td>
+                      {organizationId ? (
+                        <RowActions>
+                          <GhostButton
+                            onClick={async () => {
+                              manage.setBusyId(e.id);
+                              try {
+                                await patchEquipment(organizationId, e.id, { isActive: e.isActive === false });
+                              } catch (err) {
+                                manage.setError(writeMessage(err));
+                              } finally {
+                                manage.setBusyId(null);
+                              }
+                            }}
+                          >
+                            {e.isActive === false ? "Activer" : "Désactiver"}
+                          </GhostButton>
+                          <button
+                            type="button"
+                            className={styles.dangerButton}
+                            disabled={manage.busy(e.id)}
+                            onClick={async () => {
+                              if (!window.confirm("Supprimer cet équipement ?")) return;
+                              manage.setBusyId(e.id);
+                              try {
+                                await removeEquipment(organizationId, e.id);
+                              } catch (err) {
+                                manage.setError(writeMessage(err));
+                              } finally {
+                                manage.setBusyId(null);
+                              }
+                            }}
+                          >
+                            Supprimer
+                          </button>
+                        </RowActions>
+                      ) : null}
+                    </td>
                   </tr>
                 ))}
             </tbody>
@@ -220,6 +446,35 @@ export function SettingsPage() {
       )}
 
       <h2 className={styles.h2}>Horaires de température</h2>
+      {organizationId ? (
+        <form className={styles.manageForm} onSubmit={addSchedule}>
+          <label className={styles.field}>
+            Nom
+            <input className={styles.fieldInput} value={schedName} onChange={(e) => setSchedName(e.target.value)} required />
+          </label>
+          <label className={styles.field}>
+            Moment
+            <select className={styles.fieldInput} value={schedType} onChange={(e) => setSchedType(e.target.value)}>
+              <option value="morning">Matin</option>
+              <option value="afternoon">Après-midi</option>
+              <option value="evening">Soir</option>
+            </select>
+          </label>
+          <label className={styles.field}>
+            Heure
+            <input className={styles.fieldInput} value={schedHour} onChange={(e) => setSchedHour(e.target.value)} />
+          </label>
+          <label className={styles.field}>
+            Minute
+            <input className={styles.fieldInput} value={schedMinute} onChange={(e) => setSchedMinute(e.target.value)} />
+          </label>
+          <div className={styles.manageActions}>
+            <button className="btnGold" type="submit" disabled={manage.busyId === "sched"}>
+              Ajouter
+            </button>
+          </div>
+        </form>
+      ) : null}
       {schedules.docs.length === 0 ? (
         <p className="muted">Aucun horaire.</p>
       ) : (
@@ -231,6 +486,7 @@ export function SettingsPage() {
                 <th>Moment</th>
                 <th>Heure cible</th>
                 <th>Statut</th>
+                <th>Gestion</th>
               </tr>
             </thead>
             <tbody>
@@ -250,6 +506,37 @@ export function SettingsPage() {
                       ) : (
                         <span className={styles.tagOk}>Actif</span>
                       )}
+                    </td>
+                    <td>
+                      {organizationId ? (
+                        <RowActions>
+                          <GhostButton
+                            onClick={async () => {
+                              manage.setBusyId(s.id);
+                              try {
+                                await patchOrgDoc(organizationId, "temperatureSchedules", s.id, {
+                                  isActive: s.isActive === false,
+                                });
+                              } catch (err) {
+                                manage.setError(writeMessage(err));
+                              } finally {
+                                manage.setBusyId(null);
+                              }
+                            }}
+                          >
+                            {s.isActive === false ? "Activer" : "Désactiver"}
+                          </GhostButton>
+                          <DeleteControl
+                            organizationId={organizationId}
+                            collectionName="temperatureSchedules"
+                            id={s.id}
+                            label="cet horaire"
+                            busy={manage.busy(s.id)}
+                            onBusy={manage.setBusyId}
+                            onError={manage.setError}
+                          />
+                        </RowActions>
+                      ) : null}
                     </td>
                   </tr>
                 );
