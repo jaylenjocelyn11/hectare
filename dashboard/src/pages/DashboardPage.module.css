@@ -749,8 +749,55 @@
 }
 
 .manageForm .fieldInput,
-.manageForm select {
+.manageForm select,
+.manageForm textarea {
   width: 100%;
+}
+
+.fieldTextarea {
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #0c0c0c;
+  color: var(--text);
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 400;
+  font-size: 0.95rem;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 4.5rem;
+}
+
+.stepEditor {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.stepCard {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface) 88%, #000);
+}
+
+.stepCardTop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.stepPreview {
+  margin: 0.45rem 0 0.35rem 1.1rem;
+  padding: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
 }
 
 .manageActions {
