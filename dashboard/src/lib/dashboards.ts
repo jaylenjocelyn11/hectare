@@ -1,6 +1,6 @@
 import type { User } from "firebase/auth";
 
-export const RESERVED_SLUGS = new Set(["login", "admin", ""]);
+export const RESERVED_SLUGS = new Set(["login", "admin", "assets", ""]);
 
 export const NAV_ITEMS = [
   { key: "overview", path: "", label: "Tableau de bord" },
@@ -113,9 +113,9 @@ export function apexOrigin(): string {
   return `https://${ROOT_DOMAIN}`;
 }
 
-/** Adresse publique : https://hectare.restiq-app.ca */
+/** Adresse publique : https://restiq-app.ca/hectare */
 export function dashboardPublicUrl(slug: string): string {
-  return `https://${slugifyPrefix(slug)}.${ROOT_DOMAIN}`;
+  return `${apexOrigin()}/${slugifyPrefix(slug)}`;
 }
 
 export function defaultDashboard(partial: {

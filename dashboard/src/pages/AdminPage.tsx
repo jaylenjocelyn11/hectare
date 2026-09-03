@@ -246,10 +246,10 @@ export function AdminPage() {
       <p className={styles.kicker}>Rustiq</p>
       <h1 className={styles.h1}>Tableaux de bord</h1>
       <p className={styles.meta}>
-        Toi seul peux en créer. Chaque resto reçoit un préfixe unique : Hectare →{" "}
+        Toi seul peux en créer. Chaque resto a son préfixe dans l’adresse : Hectare →{" "}
         <code className={styles.inlineCode}>{dashboardPublicUrl("hectare")}</code>
         , un autre resto → <code className={styles.inlineCode}>{dashboardPublicUrl("bistro")}</code>
-        . Le DNS joker <code className={styles.inlineCode}>*</code> couvre tous les nouveaux préfixes, tu n’ajoutes rien à IONOS.
+        . GitHub Pages ne peut pas servir hectare.restiq-app.ca (erreur 404) ; le préfixe est donc dans le chemin.
       </p>
       {error ? <p className={styles.warn}>{error}</p> : null}
 
