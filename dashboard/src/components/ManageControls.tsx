@@ -3,9 +3,13 @@ import { removeOrgDoc, writeMessage } from "../lib/orgWrite";
 import styles from "../pages/DashboardPage.module.css";
 
 export function ManageNotice({ error, ok }: { error?: string | null; ok?: string | null }) {
-  if (error) return <p className={styles.warn}>{error}</p>;
-  if (ok) return <p className={styles.ok}>{ok}</p>;
-  return null;
+  if (!error && !ok) return null;
+  return (
+    <>
+      {error ? <p className={styles.warn}>{error}</p> : null}
+      {ok ? <p className={styles.ok}>{ok}</p> : null}
+    </>
+  );
 }
 
 export function GhostButton({

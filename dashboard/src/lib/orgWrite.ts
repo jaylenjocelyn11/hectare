@@ -1,4 +1,4 @@
-import { deleteDoc, doc, getDoc, serverTimestamp, setDoc, updateDoc, type DocumentData } from "firebase/firestore";
+import { deleteDoc, doc, getDoc, serverTimestamp, setDoc, type DocumentData } from "firebase/firestore";
 import { getFirebaseFirestore } from "./firebase";
 
 export function newOrgId(): string {
@@ -37,45 +37,6 @@ export async function patchOrgDoc(
   );
 }
 
-/** Réécrit le document pour remplacer un tableau d’objets (étapes). */
-export async function putOrgDoc(
-  organizationId: string,
-  collectionName: string,
-  id: string,
-  data: DocumentData
-): Promise<void> {
-  const ref = orgDoc(organizationId, collectionName, id);
-  const snap = await getDoc(ref);
-  if (!snap.exists()) {
-    await setDoc(ref, {
-      ...data,
-      id,
-      createdAt: data.createdAt ?? serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-    return;
-  }
-  await setDoc(ref, {
-    ...snap.data(),
-    ...data,
-    id,
-    updatedAt: serverTimestamp(),
-  });
-}
-
-/** Remplace uniquement le champ steps. */
-export async function patchOrgSteps(
-  organizationId: string,
-  collectionName: string,
-  id: string,
-  steps: DocumentData[]
-): Promise<void> {
-  await updateDoc(orgDoc(organizationId, collectionName, id), {
-    steps,
-    updatedAt: serverTimestamp(),
-  });
-}
-
 export async function removeOrgDoc(
   organizationId: string,
   collectionName: string,
@@ -112,5 +73,41 @@ export function writeMessage(err: unknown): string {
   if (err && typeof err === "object" && "code" in err && String((err as { code: string }).code) === "permission-denied") {
     return "Firestore refuse l’écriture. Vérifie les règles de la base hectarecafe.";
   }
-  return err instanceof Error ? err.message : "Enregistrement impossible";
+  if (err instanceof Error && err.message) return err.message;
+  return "Enregistrement impossible";
+}
+
+function cleanSteps(steps: DocumentData[]): DocumentData[] {
+  return JSON.parse(JSON.stringify(steps)) as DocumentData[];
+}
+
+/** Crée ou remplace un modèle de procédure avec un document Firestore propre. */
+export async function saveProcedureTemplate(
+  organizationId: string,
+  id: string,
+  fields: {
+    name: string;
+    type: string;
+    procedureDescription: string;
+    steps: DocumentData[];
+  }
+): Promise<void> {
+  const ref = orgDoc(organizationId, "procedureTemplates", id);
+  const snap = await getDoc(ref);
+  const prev = snap.exists() ? snap.data() : {};
+  const payload: DocumentData = {
+    id,
+    name: fields.name,
+    type: fields.type === "closing" ? "closing" : "opening",
+    procedureDescription: fields.procedureDescription,
+    steps: cleanSteps(fields.steps),
+    estimatedDuration: typeof prev.estimatedDuration === "number" ? prev.estimatedDuration : 0,
+    isActive: prev.isActive !== false,
+    createdAt: prev.createdAt ?? serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  };
+  if (typeof prev.temperatureScheduleId === "string" && prev.temperatureScheduleId) {
+    payload.temperatureScheduleId = prev.temperatureScheduleId;
+  }
+  await setDoc(ref, payload);
 }

@@ -9,7 +9,7 @@ import {
 } from "../components/ManageControls";
 import { useOrgCollection } from "../hooks/useOrgCollection";
 import { asDate, formatDateTime } from "../lib/dates";
-import { createOrgDoc, patchOrgDoc, patchOrgSteps, putOrgDoc, newOrgId, writeMessage } from "../lib/orgWrite";
+import { patchOrgDoc, saveProcedureTemplate, newOrgId, writeMessage } from "../lib/orgWrite";
 import { asDisplayName, asNumber, asText, namedFromDocs } from "../lib/text";
 import type { OrgContext } from "./orgContext";
 import styles from "./DashboardPage.module.css";
@@ -88,12 +88,16 @@ function draftsFromTemplate(steps: unknown): DraftStep[] {
 
 function payloadSteps(drafts: DraftStep[]) {
   return drafts
-    .map((s, i) => ({
-      text: s.text.trim(),
-      title: s.title.trim() || `Étape ${i + 1}`,
-      id: s.id,
-      photoRequired: s.photoRequired === true,
-    }))
+    .map((s, i) => {
+      const text = s.text.trim() || s.title.trim();
+      const title = s.title.trim() || `Étape ${i + 1}`;
+      return {
+        text,
+        title,
+        id: s.id || newOrgId(),
+        photoRequired: s.photoRequired === true,
+      };
+    })
     .filter((s) => s.text)
     .map((s, i) => ({
       id: String(s.id),
@@ -212,24 +216,29 @@ export function ProceduresPage() {
 
   async function addTemplate(e: FormEvent) {
     e.preventDefault();
-    if (!organizationId || !name.trim()) return;
+    if (!organizationId) {
+      manage.setError("Organisation introuvable.");
+      return;
+    }
+    if (!name.trim()) {
+      manage.setError("Indique un nom de modèle.");
+      return;
+    }
     const steps = payloadSteps(createSteps);
     if (steps.length === 0) {
-      manage.setError("Ajoute au moins une étape avec une description.");
+      manage.setError("Ajoute au moins une étape avec une description, puis Sauver.");
       return;
     }
     manage.setBusyId("create");
     manage.setError(null);
+    manage.setOk(null);
     try {
-      const createdId = await createOrgDoc(organizationId, "procedureTemplates", {
+      await saveProcedureTemplate(organizationId, newOrgId(), {
         name: name.trim(),
         type,
         procedureDescription: description.trim() || `Procédure ${type === "closing" ? "fermeture" : "ouverture"}`,
         steps,
-        estimatedDuration: 0,
-        isActive: true,
       });
-      await patchOrgSteps(organizationId, "procedureTemplates", createdId, steps);
       setName("");
       setDescription("");
       setCreateSteps([newDraftStep(1)]);
@@ -243,24 +252,30 @@ export function ProceduresPage() {
   }
 
   async function saveTemplate(id: string) {
-    if (!organizationId) return;
+    if (!organizationId) {
+      manage.setError("Organisation introuvable.");
+      return;
+    }
+    if (!editName.trim()) {
+      manage.setError("Indique un nom de modèle.");
+      return;
+    }
     const steps = payloadSteps(editSteps);
     if (steps.length === 0) {
-      manage.setError("Ajoute au moins une étape avec une description.");
+      manage.setError("Ajoute au moins une étape avec une description, puis Sauver.");
       return;
     }
     manage.setBusyId(id);
     manage.setError(null);
     try {
-      await putOrgDoc(organizationId, "procedureTemplates", id, {
+      await saveProcedureTemplate(organizationId, id, {
         name: editName.trim(),
         type: editType,
         procedureDescription: editDescription.trim(),
         steps,
       });
-      await patchOrgSteps(organizationId, "procedureTemplates", id, steps);
       manage.setEditingId(null);
-      manage.setOk("Modèle et étapes mis à jour.");
+      manage.setOk("Modèle et étapes enregistrés dans Firestore.");
     } catch (err) {
       manage.setError(writeMessage(err));
     } finally {
@@ -317,10 +332,10 @@ export function ProceduresPage() {
             {manage.creating ? "Fermer" : "Nouveau modèle"}
           </GhostButton>
           {manage.creating ? (
-            <form className={styles.manageForm} onSubmit={addTemplate}>
+            <form className={styles.manageForm} onSubmit={addTemplate} noValidate>
               <label className={styles.field}>
                 Nom
-                <input className={styles.fieldInput} value={name} onChange={(e) => setName(e.target.value)} required />
+                <input className={styles.fieldInput} value={name} onChange={(e) => setName(e.target.value)} />
               </label>
               <label className={styles.field}>
                 Type
@@ -352,18 +367,19 @@ export function ProceduresPage() {
                     {manage.editingId === t.id ? (
                       <form
                         className={styles.manageForm}
+                        noValidate
                         onSubmit={(e) => {
                           e.preventDefault();
                           void saveTemplate(t.id);
                         }}
                       >
+                        {manage.error ? <p className={styles.warn}>{manage.error}</p> : null}
                         <label className={styles.field}>
                           Nom
                           <input
                             className={styles.fieldInput}
                             value={editName}
                             onChange={(e) => setEditName(e.target.value)}
-                            required
                           />
                         </label>
                         <label className={styles.field}>
@@ -388,7 +404,7 @@ export function ProceduresPage() {
                         <TemplateStepsEditor steps={editSteps} onChange={setEditSteps} />
                         <div className={styles.manageActions}>
                           <button className="btnGold" type="submit" disabled={manage.busy(t.id)}>
-                            Sauver
+                            {manage.busy(t.id) ? "Enregistrement…" : "Sauver"}
                           </button>
                           <GhostButton onClick={() => manage.setEditingId(null)}>
                             Annuler
@@ -421,7 +437,7 @@ export function ProceduresPage() {
                             onClick={() => {
                               manage.setCreating(false);
                               manage.setEditingId(t.id);
-                              setEditName(asText(t.name, ""));
+                              setEditName(typeof t.name === "string" ? t.name : asText(t.name, ""));
                               setEditType(asText(t.type, "opening") === "—" ? "opening" : asText(t.type, "opening"));
                               setEditDescription(
                                 asText(t.procedureDescription, "") === "—" ? "" : asText(t.procedureDescription, "")
