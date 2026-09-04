@@ -47,20 +47,17 @@ type ProcedureRun = {
 type DraftStep = {
   key: string;
   id: string;
-  title: string;
   text: string;
   photoRequired: boolean;
 };
 
-function newDraftStep(order: number, existing?: ProcedureStep): DraftStep {
+function newDraftStep(_order: number, existing?: ProcedureStep): DraftStep {
   const text = asText(existing?.text, "");
   const description = asText(existing?.description, "");
-  const titleRaw = asText(existing?.title, "");
   const existingId = asText(existing?.id, "");
   return {
     key: existingId || crypto.randomUUID(),
     id: existingId || newOrgId(),
-    title: titleRaw || `Étape ${order}`,
     text: text || description,
     photoRequired: existing?.photoRequired === true,
   };
@@ -88,20 +85,15 @@ function draftsFromTemplate(steps: unknown): DraftStep[] {
 
 function payloadSteps(drafts: DraftStep[]) {
   return drafts
-    .map((s, i) => {
-      const text = s.text.trim() || s.title.trim();
-      const title = s.title.trim() || `Étape ${i + 1}`;
-      return {
-        text,
-        title,
-        id: s.id || newOrgId(),
-        photoRequired: s.photoRequired === true,
-      };
-    })
+    .map((s) => ({
+      text: s.text.trim(),
+      id: s.id || newOrgId(),
+      photoRequired: s.photoRequired === true,
+    }))
     .filter((s) => s.text)
     .map((s, i) => ({
       id: String(s.id),
-      title: s.title || `Étape ${i + 1}`,
+      title: `Étape ${i + 1}`,
       description: s.text,
       text: s.text,
       isRequired: true,
@@ -128,7 +120,7 @@ function TemplateStepsEditor({
     const copy = [...steps];
     const [item] = copy.splice(index, 1);
     copy.splice(next, 0, item);
-    onChange(copy.map((s, i) => ({ ...s, title: s.title.trim() ? s.title : `Étape ${i + 1}` })));
+    onChange(copy);
   }
 
   return (
@@ -157,15 +149,6 @@ function TemplateStepsEditor({
               </GhostButton>
             </RowActions>
           </div>
-          <label className={styles.field}>
-            Titre
-            <input
-              className={styles.fieldInput}
-              value={step.title}
-              onChange={(e) => update(step.key, { title: e.target.value })}
-              placeholder={`Étape ${index + 1}`}
-            />
-          </label>
           <label className={styles.field}>
             Description de l’étape
             <textarea
@@ -267,6 +250,7 @@ export function ProceduresPage() {
     }
     manage.setBusyId(id);
     manage.setError(null);
+    manage.setOk(null);
     try {
       await saveProcedureTemplate(organizationId, id, {
         name: editName.trim(),
@@ -421,9 +405,9 @@ export function ProceduresPage() {
                         </span>
                         {listed.length > 0 ? (
                           <ol className={styles.stepPreview}>
-                            {listed.map((s) => (
+                            {listed.map((s, i) => (
                               <li key={s.key}>
-                                {s.title}
+                                Étape {i + 1}
                                 {s.photoRequired ? <span className="muted"> (photo)</span> : null}
                                 {s.text ? <div className={styles.wrap}>{s.text}</div> : null}
                               </li>
