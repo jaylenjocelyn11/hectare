@@ -1,4 +1,4 @@
-import { deleteDoc, doc, serverTimestamp, setDoc, type DocumentData } from "firebase/firestore";
+import { deleteDoc, doc, getDoc, serverTimestamp, setDoc, updateDoc, type DocumentData } from "firebase/firestore";
 import { getFirebaseFirestore } from "./firebase";
 
 export function newOrgId(): string {
@@ -35,6 +35,45 @@ export async function patchOrgDoc(
     { ...data, updatedAt: serverTimestamp() },
     { merge: true }
   );
+}
+
+/** Réécrit le document pour remplacer un tableau d’objets (étapes). */
+export async function putOrgDoc(
+  organizationId: string,
+  collectionName: string,
+  id: string,
+  data: DocumentData
+): Promise<void> {
+  const ref = orgDoc(organizationId, collectionName, id);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) {
+    await setDoc(ref, {
+      ...data,
+      id,
+      createdAt: data.createdAt ?? serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+    return;
+  }
+  await setDoc(ref, {
+    ...snap.data(),
+    ...data,
+    id,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/** Remplace uniquement le champ steps. */
+export async function patchOrgSteps(
+  organizationId: string,
+  collectionName: string,
+  id: string,
+  steps: DocumentData[]
+): Promise<void> {
+  await updateDoc(orgDoc(organizationId, collectionName, id), {
+    steps,
+    updatedAt: serverTimestamp(),
+  });
 }
 
 export async function removeOrgDoc(

@@ -9,7 +9,7 @@ import {
 } from "../components/ManageControls";
 import { useOrgCollection } from "../hooks/useOrgCollection";
 import { asDate, formatDateTime } from "../lib/dates";
-import { createOrgDoc, newOrgId, patchOrgDoc, writeMessage } from "../lib/orgWrite";
+import { createOrgDoc, patchOrgDoc, patchOrgSteps, putOrgDoc, newOrgId, writeMessage } from "../lib/orgWrite";
 import { asDisplayName, asNumber, asText, namedFromDocs } from "../lib/text";
 import type { OrgContext } from "./orgContext";
 import styles from "./DashboardPage.module.css";
@@ -66,10 +66,22 @@ function newDraftStep(order: number, existing?: ProcedureStep): DraftStep {
   };
 }
 
+function asStepList(steps: unknown): ProcedureStep[] {
+  if (Array.isArray(steps)) {
+    return steps.filter((s): s is ProcedureStep => !!s && typeof s === "object");
+  }
+  if (steps && typeof steps === "object") {
+    return Object.values(steps as Record<string, unknown>).filter(
+      (s): s is ProcedureStep => !!s && typeof s === "object"
+    );
+  }
+  return [];
+}
+
 function draftsFromTemplate(steps: unknown): DraftStep[] {
-  if (!Array.isArray(steps) || steps.length === 0) return [newDraftStep(1)];
-  return [...steps]
-    .filter((s): s is ProcedureStep => !!s && typeof s === "object")
+  const list = asStepList(steps);
+  if (list.length === 0) return [newDraftStep(1)];
+  return [...list]
     .sort((a, b) => (asNumber(a.order) ?? 0) - (asNumber(b.order) ?? 0))
     .map((s, i) => newDraftStep(i + 1, s));
 }
@@ -77,13 +89,14 @@ function draftsFromTemplate(steps: unknown): DraftStep[] {
 function payloadSteps(drafts: DraftStep[]) {
   return drafts
     .map((s, i) => ({
-      ...s,
       text: s.text.trim(),
       title: s.title.trim() || `Étape ${i + 1}`,
+      id: s.id,
+      photoRequired: s.photoRequired === true,
     }))
     .filter((s) => s.text)
     .map((s, i) => ({
-      id: s.id,
+      id: String(s.id),
       title: s.title || `Étape ${i + 1}`,
       description: s.text,
       text: s.text,
@@ -208,7 +221,7 @@ export function ProceduresPage() {
     manage.setBusyId("create");
     manage.setError(null);
     try {
-      await createOrgDoc(organizationId, "procedureTemplates", {
+      const createdId = await createOrgDoc(organizationId, "procedureTemplates", {
         name: name.trim(),
         type,
         procedureDescription: description.trim() || `Procédure ${type === "closing" ? "fermeture" : "ouverture"}`,
@@ -216,6 +229,7 @@ export function ProceduresPage() {
         estimatedDuration: 0,
         isActive: true,
       });
+      await patchOrgSteps(organizationId, "procedureTemplates", createdId, steps);
       setName("");
       setDescription("");
       setCreateSteps([newDraftStep(1)]);
@@ -236,13 +250,15 @@ export function ProceduresPage() {
       return;
     }
     manage.setBusyId(id);
+    manage.setError(null);
     try {
-      await patchOrgDoc(organizationId, "procedureTemplates", id, {
+      await putOrgDoc(organizationId, "procedureTemplates", id, {
         name: editName.trim(),
         type: editType,
         procedureDescription: editDescription.trim(),
         steps,
       });
+      await patchOrgSteps(organizationId, "procedureTemplates", id, steps);
       manage.setEditingId(null);
       manage.setOk("Modèle et étapes mis à jour.");
     } catch (err) {
