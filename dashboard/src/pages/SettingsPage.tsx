@@ -22,6 +22,11 @@ import {
   writeMessage,
 } from "../lib/orgWrite";
 import { asDisplayName, asNumber, asText } from "../lib/text";
+import {
+  LocationCategoriesSection,
+  LocationCategorySelect,
+  locationCategoryName,
+} from "../components/LocationCategoriesSection";
 import type { OrgContext } from "./orgContext";
 import { PageShell } from "./PageShell";
 import styles from "./DashboardPage.module.css";
@@ -51,6 +56,7 @@ export function SettingsPage() {
   const { organizationId, dashboard, slug } = session;
   const users = useOrgCollection<AppUser>(organizationId, "users");
   const equipment = useEquipment(organizationId);
+  const locationCategories = useOrgCollection<{ name?: string }>(organizationId, "locationCategories");
   const schedules = useOrgCollection<Schedule>(organizationId, "temperatureSchedules");
   const [dashName, setDashName] = useState(dashboard?.name ?? "");
   const [tagline, setTagline] = useState(dashboard?.tagline ?? "Contrôle HACCP");
@@ -66,6 +72,7 @@ export function SettingsPage() {
   const [eqKind, setEqKind] = useState("cold");
   const [eqMin, setEqMin] = useState("0");
   const [eqMax, setEqMax] = useState("4");
+  const [eqLocation, setEqLocation] = useState("");
   const [schedName, setSchedName] = useState("");
   const [schedType, setSchedType] = useState("morning");
   const [schedHour, setSchedHour] = useState("8");
@@ -142,8 +149,10 @@ export function SettingsPage() {
         maxTemperature: Number(eqMax),
         temperatureUnit: "°C",
         correctiveActions: [],
+        locationCategoryId: eqLocation,
       });
       setEqName("");
+      setEqLocation("");
       manage.setOk("Équipement ajouté.");
     } catch (err) {
       manage.setError(writeMessage(err));
@@ -180,7 +189,7 @@ export function SettingsPage() {
   }
 
   return (
-    <PageShell errors={[users.error, equipment.error, schedules.error]}>
+    <PageShell errors={[users.error, equipment.error, schedules.error, locationCategories.error]}>
       <h1 className={styles.h1}>Paramètres</h1>
       <p className={styles.meta}>
         Gère utilisateurs, équipements et horaires. Les PIN existants ne s’affichent pas. Organisation :{" "}
@@ -335,6 +344,8 @@ export function SettingsPage() {
         </div>
       )}
 
+      <LocationCategoriesSection organizationId={organizationId} manage={manage} />
+
       <h2 className={styles.h2}>Équipements</h2>
       {organizationId ? (
         <form className={styles.manageForm} onSubmit={addEquipment}>
@@ -360,6 +371,14 @@ export function SettingsPage() {
             Max °C
             <input className={styles.fieldInput} value={eqMax} onChange={(e) => setEqMax(e.target.value)} />
           </label>
+          <label className={styles.field}>
+            Lieu
+            <LocationCategorySelect
+              categories={locationCategories.docs}
+              value={eqLocation}
+              onChange={setEqLocation}
+            />
+          </label>
           <div className={styles.manageActions}>
             <button className="btnGold" type="submit" disabled={manage.busyId === "eq"}>
               Ajouter
@@ -376,6 +395,7 @@ export function SettingsPage() {
               <tr>
                 <th>Nom</th>
                 <th>Type</th>
+                <th>Lieu</th>
                 <th>Plage</th>
                 <th>Actif</th>
                 <th>Gestion</th>
@@ -388,6 +408,26 @@ export function SettingsPage() {
                   <tr key={e.id}>
                     <td>{asDisplayName(e.name)}</td>
                     <td>{equipmentTypeLabel(e.type, e.kind)}</td>
+                    <td>
+                      {organizationId ? (
+                        <LocationCategorySelect
+                          categories={locationCategories.docs}
+                          value={asText(e.locationCategoryId, "")}
+                          onChange={async (next) => {
+                            manage.setBusyId(e.id);
+                            try {
+                              await patchEquipment(organizationId, e.id, { locationCategoryId: next });
+                            } catch (err) {
+                              manage.setError(writeMessage(err));
+                            } finally {
+                              manage.setBusyId(null);
+                            }
+                          }}
+                        />
+                      ) : (
+                        locationCategoryName(locationCategories.docs, e.locationCategoryId) || "—"
+                      )}
+                    </td>
                     <td>
                       {asNumber(e.minTemperature) != null && asNumber(e.maxTemperature) != null
                         ? `${asNumber(e.minTemperature)} – ${asNumber(e.maxTemperature)} °C`

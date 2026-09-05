@@ -13,6 +13,10 @@ import { patchOrgDoc, saveProcedureTemplate, newOrgId, writeMessage } from "../l
 import { asDisplayName, asNumber, asText, namedFromDocs } from "../lib/text";
 import type { OrgContext } from "./orgContext";
 import styles from "./DashboardPage.module.css";
+import {
+  LocationCategorySelect,
+  locationCategoryName,
+} from "../components/LocationCategoriesSection";
 
 type ProcedureStep = {
   id?: string;
@@ -31,6 +35,7 @@ type ProcedureTemplate = {
   procedureDescription?: string;
   isActive?: boolean;
   steps?: ProcedureStep[];
+  locationCategoryId?: string;
 };
 
 type ProcedureRun = {
@@ -180,14 +185,17 @@ export function ProceduresPage() {
   const { organizationId, resolving, error: orgError } = useOutletContext<OrgContext>();
   const templates = useOrgCollection<ProcedureTemplate>(organizationId, "procedureTemplates");
   const runs = useOrgCollection<ProcedureRun>(organizationId, "procedureRuns");
+  const locationCategories = useOrgCollection<{ name?: string }>(organizationId, "locationCategories");
   const manage = useManageState();
   const [name, setName] = useState("");
   const [type, setType] = useState("opening");
   const [description, setDescription] = useState("");
+  const [locationId, setLocationId] = useState("");
   const [createSteps, setCreateSteps] = useState<DraftStep[]>(() => [newDraftStep(1)]);
   const [editName, setEditName] = useState("");
   const [editType, setEditType] = useState("opening");
   const [editDescription, setEditDescription] = useState("");
+  const [editLocationId, setEditLocationId] = useState("");
   const [editSteps, setEditSteps] = useState<DraftStep[]>([]);
   const [editStatus, setEditStatus] = useState("completed");
 
@@ -221,9 +229,11 @@ export function ProceduresPage() {
         type,
         procedureDescription: description.trim() || `Procédure ${type === "closing" ? "fermeture" : "ouverture"}`,
         steps,
+        locationCategoryId: locationId,
       });
       setName("");
       setDescription("");
+      setLocationId("");
       setCreateSteps([newDraftStep(1)]);
       manage.setCreating(false);
       manage.setOk("Modèle créé avec ses étapes. L’iPad le verra au prochain sync.");
@@ -257,6 +267,7 @@ export function ProceduresPage() {
         type: editType,
         procedureDescription: editDescription.trim(),
         steps,
+        locationCategoryId: editLocationId,
       });
       manage.setEditingId(null);
       manage.setOk("Modèle et étapes enregistrés dans Firestore.");
@@ -291,8 +302,8 @@ export function ProceduresPage() {
     <>
       {resolving ? <p className="muted">Recherche de l’organisation…</p> : null}
       {orgError ? <p className={styles.warn}>{orgError}</p> : null}
-      {templates.error || runs.error ? (
-        <p className={styles.warn}>{templates.error || runs.error}</p>
+      {templates.error || runs.error || locationCategories.error ? (
+        <p className={styles.warn}>{templates.error || runs.error || locationCategories.error}</p>
       ) : null}
 
       {!resolving && organizationId ? (
@@ -331,6 +342,14 @@ export function ProceduresPage() {
               <label className={styles.field}>
                 Description
                 <input className={styles.fieldInput} value={description} onChange={(e) => setDescription(e.target.value)} />
+              </label>
+              <label className={styles.field}>
+                Lieu
+                <LocationCategorySelect
+                  categories={locationCategories.docs}
+                  value={locationId}
+                  onChange={setLocationId}
+                />
               </label>
               <TemplateStepsEditor steps={createSteps} onChange={setCreateSteps} />
               <div className={styles.manageActions}>
@@ -385,6 +404,14 @@ export function ProceduresPage() {
                             onChange={(e) => setEditDescription(e.target.value)}
                           />
                         </label>
+                        <label className={styles.field}>
+                          Lieu
+                          <LocationCategorySelect
+                            categories={locationCategories.docs}
+                            value={editLocationId}
+                            onChange={setEditLocationId}
+                          />
+                        </label>
                         <TemplateStepsEditor steps={editSteps} onChange={setEditSteps} />
                         <div className={styles.manageActions}>
                           <button className="btnGold" type="submit" disabled={manage.busy(t.id)}>
@@ -399,6 +426,12 @@ export function ProceduresPage() {
                       <>
                         <strong>{asDisplayName(t.name, t.id)}</strong>
                         {asText(t.type, "") ? <span className="muted"> — {asText(t.type)}</span> : null}
+                        {locationCategoryName(locationCategories.docs, t.locationCategoryId) ? (
+                          <span className="muted">
+                            {" "}
+                            · {locationCategoryName(locationCategories.docs, t.locationCategoryId)}
+                          </span>
+                        ) : null}
                         <span className="muted">
                           {" "}
                           · {listed.length} étape{listed.length === 1 ? "" : "s"}
@@ -426,6 +459,7 @@ export function ProceduresPage() {
                               setEditDescription(
                                 asText(t.procedureDescription, "") === "—" ? "" : asText(t.procedureDescription, "")
                               );
+                              setEditLocationId(asText(t.locationCategoryId, ""));
                               setEditSteps(draftsFromTemplate(t.steps));
                             }}
                           >

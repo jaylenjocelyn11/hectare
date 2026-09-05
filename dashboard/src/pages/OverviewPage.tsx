@@ -1,4 +1,6 @@
 import { useOutletContext } from "react-router-dom";
+import { LocationCategoriesSection } from "../components/LocationCategoriesSection";
+import { ManageNotice, useManageState } from "../components/ManageControls";
 import { useEquipment } from "../hooks/useEquipment";
 import { useOrgCollection } from "../hooks/useOrgCollection";
 import { asDate, formatDateTime, isSameLocalDay } from "../lib/dates";
@@ -37,6 +39,7 @@ export function OverviewPage() {
     organizationId,
     "procedureTemplates"
   );
+  const manage = useManageState();
 
   const listenError =
     equipment.error || readings.error || runs.error || templates.error;
@@ -128,6 +131,9 @@ export function OverviewPage() {
               ) : null}
             </article>
           </div>
+
+          <ManageNotice error={manage.error} ok={manage.ok} />
+          <LocationCategoriesSection organizationId={organizationId} manage={manage} />
 
           <h2 className={styles.h2}>Derniers relevés</h2>
           {latestReadings.length === 0 ? (

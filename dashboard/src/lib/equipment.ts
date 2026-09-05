@@ -7,6 +7,7 @@ export type EquipmentFields = {
   isActive?: boolean;
   minTemperature?: unknown;
   maxTemperature?: unknown;
+  locationCategoryId?: unknown;
 };
 
 export type EquipmentDoc = EquipmentFields & { id: string; linkedId?: string };

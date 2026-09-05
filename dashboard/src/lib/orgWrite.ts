@@ -90,6 +90,7 @@ export async function saveProcedureTemplate(
     type: string;
     procedureDescription: string;
     steps: DocumentData[];
+    locationCategoryId?: string | null;
   }
 ): Promise<void> {
   const ref = orgDoc(organizationId, "procedureTemplates", id);
@@ -109,5 +110,12 @@ export async function saveProcedureTemplate(
   if (typeof prev.temperatureScheduleId === "string" && prev.temperatureScheduleId) {
     payload.temperatureScheduleId = prev.temperatureScheduleId;
   }
+  const nextLocation =
+    fields.locationCategoryId !== undefined
+      ? (fields.locationCategoryId ?? "").trim()
+      : typeof prev.locationCategoryId === "string"
+        ? prev.locationCategoryId
+        : "";
+  payload.locationCategoryId = nextLocation;
   await setDoc(ref, payload);
 }
