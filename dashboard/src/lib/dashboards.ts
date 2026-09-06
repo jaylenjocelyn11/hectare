@@ -10,6 +10,7 @@ export const NAV_ITEMS = [
   { key: "inventory", path: "inventory", label: "Inventaire" },
   { key: "groups", path: "groups", label: "Groupe" },
   { key: "schedule", path: "horaire", label: "Horaire" },
+  { key: "pointages", path: "pointages", label: "Pointages" },
   { key: "reports", path: "reports", label: "Rapports" },
   { key: "settings", path: "settings", label: "Paramètres" },
 ] as const;

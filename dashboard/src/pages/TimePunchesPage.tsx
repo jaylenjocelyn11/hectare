@@ -1,11 +1,20 @@
 import { FormEvent, useMemo, useState } from "react";
 import { Timestamp } from "firebase/firestore";
-import { DeleteControl, GhostButton, RowActions } from "./ManageControls";
+import { useOutletContext } from "react-router-dom";
+import {
+  DeleteControl,
+  GhostButton,
+  ManageNotice,
+  RowActions,
+  useManageState,
+} from "../components/ManageControls";
 import { useOrgCollection } from "../hooks/useOrgCollection";
 import { asDate, formatDateTime, isSameLocalDay } from "../lib/dates";
 import { createOrgDoc, patchOrgDoc, writeMessage } from "../lib/orgWrite";
 import { asText } from "../lib/text";
-import styles from "../pages/DashboardPage.module.css";
+import type { OrgContext } from "./orgContext";
+import { PageShell } from "./PageShell";
+import styles from "./DashboardPage.module.css";
 
 type AppUser = {
   name?: string;
@@ -24,13 +33,7 @@ type TimePunch = {
   source?: string;
 };
 
-type ManageLike = {
-  busyId: string | null;
-  setBusyId: (id: string | null) => void;
-  setError: (msg: string | null) => void;
-  setOk: (msg: string | null) => void;
-  busy: (id: string) => boolean;
-};
+type RangeKey = "today" | "week" | "all";
 
 function normalizeBadge(raw: string): string {
   return raw.replace(/\D/g, "");
@@ -52,10 +55,27 @@ function fromLocalInput(value: string): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function formatDuration(start: Date | null, end: Date | null): string {
-  if (!start) return "—";
-  const close = end ?? new Date();
-  const total = Math.max(0, Math.round((close.getTime() - start.getTime()) / 60000));
+function startOfDay(date = new Date()): Date {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function mondayOf(date = new Date()): Date {
+  const d = startOfDay(date);
+  const weekday = d.getDay();
+  d.setDate(d.getDate() + (weekday === 0 ? -6 : 1 - weekday));
+  return d;
+}
+
+function punchMinutes(punch: TimePunch): number {
+  const clockIn = asDate(punch.clockInAt);
+  if (!clockIn) return 0;
+  const clockOut = asDate(punch.clockOutAt) ?? new Date();
+  return Math.max(0, Math.round((clockOut.getTime() - clockIn.getTime()) / 60000));
+}
+
+function formatMinutes(total: number): string {
   const hours = Math.floor(total / 60);
   const minutes = total % 60;
   if (!hours) return `${minutes} min`;
@@ -63,15 +83,31 @@ function formatDuration(start: Date | null, end: Date | null): string {
   return `${hours} h ${minutes} min`;
 }
 
-export function TimePunchesSection({
-  organizationId,
-  manage,
-}: {
-  organizationId: string | null;
-  manage: ManageLike;
-}) {
+function formatDuration(start: Date | null, end: Date | null): string {
+  if (!start) return "—";
+  const close = end ?? new Date();
+  return formatMinutes(Math.max(0, Math.round((close.getTime() - start.getTime()) / 60000)));
+}
+
+function belongsToUser(punch: TimePunch, userId: string): boolean {
+  return (punch.userId || "").toLowerCase() === userId.toLowerCase();
+}
+
+function inRange(punch: TimePunch, range: RangeKey): boolean {
+  const clockIn = asDate(punch.clockInAt);
+  if (!clockIn) return false;
+  if (range === "all") return true;
+  if (range === "today") return isSameLocalDay(clockIn, new Date());
+  return clockIn.getTime() >= mondayOf().getTime();
+}
+
+export function TimePunchesPage() {
+  const { organizationId } = useOutletContext<OrgContext>();
   const users = useOrgCollection<AppUser>(organizationId, "users");
   const punches = useOrgCollection<TimePunch>(organizationId, "timePunches");
+  const manage = useManageState();
+  const [selectedUserId, setSelectedUserId] = useState("all");
+  const [range, setRange] = useState<RangeKey>("week");
   const [badgeDrafts, setBadgeDrafts] = useState<Record<string, string>>({});
   const [manualUserId, setManualUserId] = useState("");
   const [manualIn, setManualIn] = useState("");
@@ -95,11 +131,23 @@ export function TimePunchesSection({
     });
   }, [punches.docs]);
 
-  const todayPunches = sortedPunches.filter((p) => {
+  const memberPunches = useMemo(() => {
+    return sortedPunches.filter((punch) => {
+      if (selectedUserId !== "all" && !belongsToUser(punch, selectedUserId)) return false;
+      return inRange(punch, range);
+    });
+  }, [sortedPunches, selectedUserId, range]);
+
+  const selectedUser = employees.find((u) => u.id === selectedUserId);
+  const openCount = sortedPunches.filter((p) => !asDate(p.clockOutAt)).length;
+  const todayCount = sortedPunches.filter((p) => {
     const d = asDate(p.clockInAt);
     return d ? isSameLocalDay(d, new Date()) : false;
-  });
-  const openCount = sortedPunches.filter((p) => !asDate(p.clockOutAt)).length;
+  }).length;
+
+  function userPunches(userId: string) {
+    return sortedPunches.filter((punch) => belongsToUser(punch, userId));
+  }
 
   function badgeValue(userId: string, stored?: string): string {
     return badgeDrafts[userId] ?? (typeof stored === "string" ? stored : "");
@@ -198,17 +246,20 @@ export function TimePunchesSection({
     }
   }
 
-  if (!organizationId) return null;
+  function selectMember(userId: string) {
+    setSelectedUserId(userId);
+    setEditId(null);
+    if (userId !== "all") setManualUserId(userId);
+  }
 
   return (
-    <>
-      <h2 className={styles.h2}>Pointages et badges</h2>
-      {users.error ? <p className={styles.warn}>{users.error}</p> : null}
-      {punches.error ? <p className={styles.warn}>{punches.error}</p> : null}
+    <PageShell errors={[users.error, punches.error]}>
+      <h1 className={styles.h1}>Pointages</h1>
       <p className={styles.meta}>
-        Attribue un numéro de badge à chaque employé, puis corrige ou ajoute des pointages. Les
-        employés pointent sur l’iPad avec ce numéro.
+        Gère les numéros de badge et consulte les arrivées et départs de chaque membre. Les employés
+        pointent sur l’iPad avec leur badge.
       </p>
+      <ManageNotice error={manage.error} ok={manage.ok} />
 
       <div className={styles.kpis}>
         <article className={styles.kpi}>
@@ -217,15 +268,88 @@ export function TimePunchesSection({
         </article>
         <article className={styles.kpi}>
           <span className={styles.kpiLabel}>Pointages aujourd’hui</span>
-          <strong className={styles.kpiValue}>{todayPunches.length}</strong>
+          <strong className={styles.kpiValue}>{todayCount}</strong>
+        </article>
+        <article className={styles.kpi}>
+          <span className={styles.kpiLabel}>Employés actifs</span>
+          <strong className={styles.kpiValue}>{employees.length}</strong>
         </article>
       </div>
 
-      <h3 className={styles.h2}>Numéros de badge</h3>
+      <div className={styles.modeTabs} role="tablist" aria-label="Période">
+        {(
+          [
+            ["today", "Aujourd’hui"],
+            ["week", "Cette semaine"],
+            ["all", "Tout"],
+          ] as const
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={range === key}
+            className={range === key ? styles.modeTabActive : styles.modeTab}
+            onClick={() => setRange(key)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <h2 className={styles.h2}>Membres</h2>
       {users.loading ? <p className="muted">Chargement des employés…</p> : null}
       {employees.length === 0 ? (
         <p className="muted">Aucun utilisateur actif. Ajoute-les dans Paramètres.</p>
       ) : (
+        <div className={styles.roster}>
+          <button
+            type="button"
+            className={selectedUserId === "all" ? styles.rosterMe : styles.rosterCard}
+            onClick={() => selectMember("all")}
+          >
+            <div>
+              <strong>Toute l’équipe</strong>
+              <div className={styles.hint}>{sortedPunches.length} pointage(s) au total</div>
+            </div>
+            <div className={styles.rosterTimes}>
+              <span className={styles.hint}>Voir tout</span>
+            </div>
+          </button>
+          {employees.map((user) => {
+            const list = userPunches(user.id);
+            const open = list.find((p) => !asDate(p.clockOutAt));
+            const weekMinutes = list.filter((p) => inRange(p, "week")).reduce((sum, p) => sum + punchMinutes(p), 0);
+            const todayMinutes = list.filter((p) => inRange(p, "today")).reduce((sum, p) => sum + punchMinutes(p), 0);
+            return (
+              <button
+                key={user.id}
+                type="button"
+                className={selectedUserId === user.id ? styles.rosterMe : styles.rosterCard}
+                onClick={() => selectMember(user.id)}
+              >
+                <div>
+                  <strong>{asText(user.name, "Employé")}</strong>
+                  {open ? <span className={styles.tagOk}> En poste</span> : null}
+                  <div className={styles.hint}>
+                    Badge {asText(user.badgeNumber, "non attribué")}
+                    {asText(user.role, "") === "manager" ? " · Manager" : ""}
+                  </div>
+                </div>
+                <div className={styles.rosterTimes}>
+                  {open ? `Depuis ${formatDateTime(open.clockInAt)}` : "Absent"}
+                  <span className={styles.hint}>
+                    Aujourd’hui {formatMinutes(todayMinutes)} · Semaine {formatMinutes(weekMinutes)}
+                  </span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      <h2 className={styles.h2}>Numéros de badge</h2>
+      {employees.length === 0 ? null : (
         <div className={styles.tableWrap}>
           <table className={styles.table}>
             <thead>
@@ -275,7 +399,7 @@ export function TimePunchesSection({
         </div>
       )}
 
-      <h3 className={styles.h2}>Ajouter un pointage</h3>
+      <h2 className={styles.h2}>Ajouter un pointage</h2>
       <form className={styles.manageForm} onSubmit={addManualPunch}>
         <label className={styles.field}>
           Employé
@@ -319,10 +443,19 @@ export function TimePunchesSection({
         </div>
       </form>
 
-      <h3 className={styles.h2}>Historique</h3>
+      <h2 className={styles.h2}>
+        {selectedUser ? `Pointages de ${asText(selectedUser.name, "l’employé")}` : "Historique de l’équipe"}
+      </h2>
+      <p className={styles.hint}>
+        {range === "today"
+          ? "Affichage : aujourd’hui"
+          : range === "week"
+            ? "Affichage : depuis lundi"
+            : "Affichage : tous les pointages"}
+      </p>
       {punches.loading ? <p className="muted">Chargement des pointages…</p> : null}
-      {sortedPunches.length === 0 ? (
-        <p className="muted">Aucun pointage pour l’instant.</p>
+      {memberPunches.length === 0 ? (
+        <p className="muted">Aucun pointage pour cette sélection.</p>
       ) : (
         <div className={styles.tableWrap}>
           <table className={styles.table}>
@@ -337,7 +470,7 @@ export function TimePunchesSection({
               </tr>
             </thead>
             <tbody>
-              {sortedPunches.map((punch) => {
+              {memberPunches.map((punch) => {
                 const clockIn = asDate(punch.clockInAt);
                 const clockOut = asDate(punch.clockOutAt);
                 const editing = editId === punch.id;
@@ -373,39 +506,41 @@ export function TimePunchesSection({
                     </td>
                     <td>{formatDuration(clockIn, clockOut)}</td>
                     <td>
-                      <RowActions>
-                        {editing ? (
-                          <>
+                      {organizationId ? (
+                        <RowActions>
+                          {editing ? (
+                            <>
+                              <GhostButton
+                                disabled={manage.busy(punch.id)}
+                                onClick={() => void saveEdit(punch.id)}
+                              >
+                                Sauver
+                              </GhostButton>
+                              <GhostButton onClick={() => setEditId(null)}>Annuler</GhostButton>
+                            </>
+                          ) : (
                             <GhostButton
-                              disabled={manage.busy(punch.id)}
-                              onClick={() => void saveEdit(punch.id)}
+                              onClick={() => {
+                                setEditId(punch.id);
+                                setEditIn(toLocalInput(punch.clockInAt));
+                                setEditOut(toLocalInput(punch.clockOutAt));
+                                setEditNote(typeof punch.note === "string" ? punch.note : "");
+                              }}
                             >
-                              Sauver
+                              Modifier
                             </GhostButton>
-                            <GhostButton onClick={() => setEditId(null)}>Annuler</GhostButton>
-                          </>
-                        ) : (
-                          <GhostButton
-                            onClick={() => {
-                              setEditId(punch.id);
-                              setEditIn(toLocalInput(punch.clockInAt));
-                              setEditOut(toLocalInput(punch.clockOutAt));
-                              setEditNote(typeof punch.note === "string" ? punch.note : "");
-                            }}
-                          >
-                            Modifier
-                          </GhostButton>
-                        )}
-                        <DeleteControl
-                          organizationId={organizationId}
-                          collectionName="timePunches"
-                          id={punch.id}
-                          label="ce pointage"
-                          busy={manage.busy(punch.id)}
-                          onBusy={manage.setBusyId}
-                          onError={manage.setError}
-                        />
-                      </RowActions>
+                          )}
+                          <DeleteControl
+                            organizationId={organizationId}
+                            collectionName="timePunches"
+                            id={punch.id}
+                            label="ce pointage"
+                            busy={manage.busy(punch.id)}
+                            onBusy={manage.setBusyId}
+                            onError={manage.setError}
+                          />
+                        </RowActions>
+                      ) : null}
                     </td>
                   </tr>
                 );
@@ -414,6 +549,6 @@ export function TimePunchesSection({
           </table>
         </div>
       )}
-    </>
+    </PageShell>
   );
 }

@@ -8,6 +8,7 @@ import {
   IconGear,
   IconPeople,
   IconReport,
+  IconClock,
   IconSchedule,
   IconThermometer,
 } from "../components/NavIcons";
@@ -32,6 +33,7 @@ const ICONS = {
   inventory: IconBox,
   groups: IconPeople,
   schedule: IconSchedule,
+  pointages: IconClock,
   reports: IconReport,
   settings: IconGear,
 } as const;

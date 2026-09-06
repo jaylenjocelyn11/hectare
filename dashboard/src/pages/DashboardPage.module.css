@@ -674,6 +674,15 @@
   background: color-mix(in srgb, var(--gold) 12%, var(--surface));
 }
 
+button.rosterCard,
+button.rosterMe {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
 .rosterTimes {
   display: flex;
   flex-direction: column;
