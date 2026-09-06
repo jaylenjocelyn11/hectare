@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import {
+  DangerButton,
   DeleteControl,
   GhostButton,
   ManageNotice,
@@ -19,6 +20,7 @@ import {
   patchEquipment,
   patchOrgDoc,
   removeEquipment,
+  removeUser,
   writeMessage,
 } from "../lib/orgWrite";
 import { asDisplayName, asNumber, asText } from "../lib/text";
@@ -325,15 +327,23 @@ export function SettingsPage() {
                           >
                             {u.isActive === false ? "Activer" : "Désactiver"}
                           </GhostButton>
-                          <DeleteControl
-                            organizationId={organizationId}
-                            collectionName="users"
-                            id={u.id}
-                            label="cet utilisateur"
-                            busy={manage.busy(u.id)}
-                            onBusy={manage.setBusyId}
-                            onError={manage.setError}
-                          />
+                          <DangerButton
+                            disabled={manage.busy(u.id)}
+                            onClick={async () => {
+                              if (!window.confirm("Supprimer cet utilisateur ? L’iPad se mettra à jour tout seul.")) return;
+                              manage.setBusyId(u.id);
+                              manage.setError(null);
+                              try {
+                                await removeUser(organizationId, u.id, u.linkedId);
+                              } catch (err) {
+                                manage.setError(writeMessage(err));
+                              } finally {
+                                manage.setBusyId(null);
+                              }
+                            }}
+                          >
+                            {manage.busy(u.id) ? "…" : "Supprimer"}
+                          </DangerButton>
                         </RowActions>
                       ) : null}
                     </td>

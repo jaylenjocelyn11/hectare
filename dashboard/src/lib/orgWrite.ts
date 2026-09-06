@@ -45,6 +45,29 @@ export async function removeOrgDoc(
   await deleteDoc(orgDoc(organizationId, collectionName, id));
 }
 
+/** L’iPad écrit parfois l’UUID en majuscules, le site en minuscules : on efface les deux. */
+export async function removeUser(
+  organizationId: string,
+  id: string,
+  linkedId?: string
+): Promise<void> {
+  const variants = new Set<string>();
+  for (const raw of [id, linkedId]) {
+    const value = (raw || "").trim();
+    if (!value) continue;
+    variants.add(value);
+    variants.add(value.toUpperCase());
+    variants.add(value.toLowerCase());
+  }
+  const results = await Promise.allSettled(
+    [...variants].map((docId) => removeOrgDoc(organizationId, "users", docId))
+  );
+  if (results.length === 0 || results.every((result) => result.status === "rejected")) {
+    const first = results[0];
+    throw first && first.status === "rejected" ? first.reason : new Error("Suppression impossible");
+  }
+}
+
 /** L’iPad écrit `equipment` ; une ancienne collection `equipments` existe encore. */
 export async function removeEquipment(organizationId: string, id: string): Promise<void> {
   const results = await Promise.allSettled([
