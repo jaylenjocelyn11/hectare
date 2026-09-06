@@ -21,6 +21,7 @@ const SMALL_COLLECTIONS = new Set([
   "inventory",
   "employeeSchedules",
   "locationCategories",
+  "timePunches",
 ]);
 
 const HEAVY_KEYS = new Set([

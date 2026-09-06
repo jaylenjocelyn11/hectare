@@ -1,6 +1,7 @@
 import { useOutletContext } from "react-router-dom";
 import { LocationCategoriesSection } from "../components/LocationCategoriesSection";
 import { ManageNotice, useManageState } from "../components/ManageControls";
+import { TimePunchesSection } from "../components/TimePunchesSection";
 import { useEquipment } from "../hooks/useEquipment";
 import { useOrgCollection } from "../hooks/useOrgCollection";
 import { asDate, formatDateTime, isSameLocalDay } from "../lib/dates";
@@ -133,6 +134,7 @@ export function OverviewPage() {
           </div>
 
           <ManageNotice error={manage.error} ok={manage.ok} />
+          <TimePunchesSection organizationId={organizationId} manage={manage} />
           <LocationCategoriesSection organizationId={organizationId} manage={manage} />
 
           <h2 className={styles.h2}>Derniers relevés</h2>
