@@ -20,13 +20,11 @@ type AppUser = {
   name?: string;
   role?: string;
   isActive?: boolean;
-  badgeNumber?: string;
 };
 
 type TimePunch = {
   userId?: string;
   userName?: string;
-  badgeNumber?: string;
   clockInAt?: unknown;
   clockOutAt?: unknown;
   note?: string;
@@ -34,10 +32,6 @@ type TimePunch = {
 };
 
 type RangeKey = "today" | "week" | "all";
-
-function normalizeBadge(raw: string): string {
-  return raw.replace(/\D/g, "");
-}
 
 function pad(n: number): string {
   return String(n).padStart(2, "0");
@@ -108,7 +102,6 @@ export function TimePunchesPage() {
   const manage = useManageState();
   const [selectedUserId, setSelectedUserId] = useState("all");
   const [range, setRange] = useState<RangeKey>("week");
-  const [badgeDrafts, setBadgeDrafts] = useState<Record<string, string>>({});
   const [manualUserId, setManualUserId] = useState("");
   const [manualIn, setManualIn] = useState("");
   const [manualOut, setManualOut] = useState("");
@@ -149,40 +142,6 @@ export function TimePunchesPage() {
     return sortedPunches.filter((punch) => belongsToUser(punch, userId));
   }
 
-  function badgeValue(userId: string, stored?: string): string {
-    return badgeDrafts[userId] ?? (typeof stored === "string" ? stored : "");
-  }
-
-  async function saveBadge(userId: string, current: string) {
-    if (!organizationId) return;
-    const badge = normalizeBadge(current);
-    if (badge && (badge.length < 3 || badge.length > 8)) {
-      manage.setError("Le numéro de badge doit contenir 3 à 8 chiffres.");
-      return;
-    }
-    const duplicate = employees.find(
-      (u) => u.id !== userId && normalizeBadge(asText(u.badgeNumber, "")) === badge && badge
-    );
-    if (duplicate) {
-      manage.setError(`Ce badge est déjà attribué à ${asText(duplicate.name, "un employé")}.`);
-      return;
-    }
-    manage.setBusyId(`badge-${userId}`);
-    try {
-      await patchOrgDoc(organizationId, "users", userId, { badgeNumber: badge });
-      manage.setOk(badge ? "Numéro de badge enregistré." : "Numéro de badge retiré.");
-      setBadgeDrafts((prev) => {
-        const next = { ...prev };
-        delete next[userId];
-        return next;
-      });
-    } catch (err) {
-      manage.setError(writeMessage(err));
-    } finally {
-      manage.setBusyId(null);
-    }
-  }
-
   async function addManualPunch(e: FormEvent) {
     e.preventDefault();
     if (!organizationId || !manualUserId) return;
@@ -202,7 +161,6 @@ export function TimePunchesPage() {
       await createOrgDoc(organizationId, "timePunches", {
         userId: manualUserId,
         userName: asText(user?.name, "Employé"),
-        badgeNumber: normalizeBadge(asText(user?.badgeNumber, "")),
         clockInAt: Timestamp.fromDate(clockIn),
         clockOutAt: clockOut ? Timestamp.fromDate(clockOut) : null,
         note: "",
@@ -256,8 +214,7 @@ export function TimePunchesPage() {
     <PageShell errors={[users.error, punches.error]}>
       <h1 className={styles.h1}>Pointages</h1>
       <p className={styles.meta}>
-        Gère les numéros de badge et consulte les arrivées et départs de chaque membre. Les employés
-        pointent sur l’iPad avec leur badge.
+        Gère les arrivées et départs. Les employés pointent sur l’iPad avec le compte déjà connecté.
       </p>
       <ManageNotice error={manage.error} ok={manage.ok} />
 
@@ -332,8 +289,7 @@ export function TimePunchesPage() {
                   <strong>{asText(user.name, "Employé")}</strong>
                   {open ? <span className={styles.tagOk}> En poste</span> : null}
                   <div className={styles.hint}>
-                    Badge {asText(user.badgeNumber, "non attribué")}
-                    {asText(user.role, "") === "manager" ? " · Manager" : ""}
+                    {asText(user.role, "") === "manager" ? "Manager" : "Employé"}
                   </div>
                 </div>
                 <div className={styles.rosterTimes}>
@@ -345,57 +301,6 @@ export function TimePunchesPage() {
               </button>
             );
           })}
-        </div>
-      )}
-
-      <h2 className={styles.h2}>Numéros de badge</h2>
-      {employees.length === 0 ? null : (
-        <div className={styles.tableWrap}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>Employé</th>
-                <th>Rôle</th>
-                <th>Badge</th>
-                <th>Gestion</th>
-              </tr>
-            </thead>
-            <tbody>
-              {employees.map((user) => {
-                const value = badgeValue(user.id, user.badgeNumber);
-                return (
-                  <tr key={user.id}>
-                    <td>{asText(user.name, "Employé")}</td>
-                    <td>{asText(user.role, "") === "manager" ? "Manager" : "Employé"}</td>
-                    <td>
-                      <input
-                        className={styles.fieldInput}
-                        inputMode="numeric"
-                        placeholder="ex. 1042"
-                        value={value}
-                        onChange={(e) =>
-                          setBadgeDrafts((prev) => ({
-                            ...prev,
-                            [user.id]: normalizeBadge(e.target.value).slice(0, 8),
-                          }))
-                        }
-                      />
-                    </td>
-                    <td>
-                      <RowActions>
-                        <GhostButton
-                          disabled={manage.busy(`badge-${user.id}`)}
-                          onClick={() => void saveBadge(user.id, value)}
-                        >
-                          Enregistrer
-                        </GhostButton>
-                      </RowActions>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
         </div>
       )}
 
@@ -462,7 +367,6 @@ export function TimePunchesPage() {
             <thead>
               <tr>
                 <th>Employé</th>
-                <th>Badge</th>
                 <th>Arrivée</th>
                 <th>Départ</th>
                 <th>Durée</th>
@@ -477,7 +381,6 @@ export function TimePunchesPage() {
                 return (
                   <tr key={punch.id}>
                     <td>{asText(punch.userName, "Employé")}</td>
-                    <td>{asText(punch.badgeNumber, "—")}</td>
                     <td>
                       {editing ? (
                         <input
