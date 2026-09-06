@@ -19,6 +19,7 @@ import {
   createOrgDoc,
   patchEquipment,
   patchOrgDoc,
+  patchUser,
   removeEquipment,
   removeUser,
   writeMessage,
@@ -70,6 +71,16 @@ export function SettingsPage() {
   const [userName, setUserName] = useState("");
   const [userRole, setUserRole] = useState("employee");
   const [userPin, setUserPin] = useState("");
+  const [userPassword, setUserPassword] = useState("");
+  const [userPassword2, setUserPassword2] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editLinkedId, setEditLinkedId] = useState<string | undefined>(undefined);
+  const [editName, setEditName] = useState("");
+  const [editRole, setEditRole] = useState("employee");
+  const [editActive, setEditActive] = useState(true);
+  const [editPassword, setEditPassword] = useState("");
+  const [editPassword2, setEditPassword2] = useState("");
+  const [editPin, setEditPin] = useState("");
   const [eqName, setEqName] = useState("");
   const [eqKind, setEqKind] = useState("cold");
   const [eqMin, setEqMin] = useState("0");
@@ -118,18 +129,87 @@ export function SettingsPage() {
   async function addUser(e: FormEvent) {
     e.preventDefault();
     if (!organizationId || !userName.trim()) return;
+    const password = userPassword.trim();
+    if (password.length < 4) {
+      manage.setError("Le mot de passe doit contenir au moins 4 caractères.");
+      return;
+    }
+    if (password !== userPassword2) {
+      manage.setError("Les mots de passe ne correspondent pas.");
+      return;
+    }
+    if (userRole === "manager" && userPin.trim() && !/^\d{4}$/.test(userPin.trim())) {
+      manage.setError("Le PIN manager doit contenir 4 chiffres.");
+      return;
+    }
     manage.setBusyId("user");
+    manage.setError(null);
     try {
       await createOrgDoc(organizationId, "users", {
         name: userName.trim(),
         role: userRole,
+        password,
         ...(userPin.trim() ? { pin: userPin.trim() } : {}),
         isActive: true,
         fcmTokens: [],
       });
       setUserName("");
       setUserPin("");
-      manage.setOk("Utilisateur créé (PIN pour l’iPad).");
+      setUserPassword("");
+      setUserPassword2("");
+      manage.setOk("Utilisateur créé. L’iPad se met à jour tout seul.");
+    } catch (err) {
+      manage.setError(writeMessage(err));
+    } finally {
+      manage.setBusyId(null);
+    }
+  }
+
+  function startEdit(u: (typeof users.docs)[number]) {
+    setEditingId(u.id);
+    setEditLinkedId(u.linkedId);
+    setEditName(asText(u.name));
+    setEditRole(asText(u.role, "employee") || "employee");
+    setEditActive(u.isActive !== false);
+    setEditPassword("");
+    setEditPassword2("");
+    setEditPin("");
+    manage.setError(null);
+    manage.setOk(null);
+  }
+
+  async function saveEdit(e: FormEvent) {
+    e.preventDefault();
+    if (!organizationId || !editingId || !editName.trim()) return;
+    const password = editPassword.trim();
+    if (password && password.length < 4) {
+      manage.setError("Le mot de passe doit contenir au moins 4 caractères.");
+      return;
+    }
+    if (password && password !== editPassword2.trim()) {
+      manage.setError("Les mots de passe ne correspondent pas.");
+      return;
+    }
+    if (editRole === "manager" && editPin.trim() && !/^\d{4}$/.test(editPin.trim())) {
+      manage.setError("Le PIN manager doit contenir 4 chiffres.");
+      return;
+    }
+    manage.setBusyId(editingId);
+    manage.setError(null);
+    try {
+      const payload: Record<string, unknown> = {
+        name: editName.trim(),
+        role: editRole,
+        isActive: editActive,
+      };
+      if (password) payload.password = password;
+      if (editRole === "manager" && editPin.trim()) payload.pin = editPin.trim();
+      await patchUser(organizationId, editingId, payload, editLinkedId);
+      setEditingId(null);
+      setEditPassword("");
+      setEditPassword2("");
+      setEditPin("");
+      manage.setOk("Utilisateur mis à jour. L’iPad se met à jour tout seul.");
     } catch (err) {
       manage.setError(writeMessage(err));
     } finally {
@@ -194,7 +274,8 @@ export function SettingsPage() {
     <PageShell errors={[users.error, equipment.error, schedules.error, locationCategories.error]}>
       <h1 className={styles.h1}>Paramètres</h1>
       <p className={styles.meta}>
-        Gère utilisateurs, équipements et horaires. Les PIN existants ne s’affichent pas. Organisation :{" "}
+        Gère utilisateurs, mots de passe, équipements et horaires. Les mots de passe et PIN existants ne
+        s’affichent pas. Organisation :{" "}
         {organizationId}
       </p>
       <ManageNotice error={manage.error} ok={manage.ok} />
@@ -268,13 +349,107 @@ export function SettingsPage() {
             </select>
           </label>
           <label className={styles.field}>
+            Mot de passe
+            <input
+              className={styles.fieldInput}
+              type="password"
+              autoComplete="new-password"
+              value={userPassword}
+              onChange={(e) => setUserPassword(e.target.value)}
+              required
+            />
+          </label>
+          <label className={styles.field}>
+            Confirmer
+            <input
+              className={styles.fieldInput}
+              type="password"
+              autoComplete="new-password"
+              value={userPassword2}
+              onChange={(e) => setUserPassword2(e.target.value)}
+              required
+            />
+          </label>
+          <label className={styles.field}>
             PIN iPad
-            <input className={styles.fieldInput} value={userPin} onChange={(e) => setUserPin(e.target.value)} />
+            <input
+              className={styles.fieldInput}
+              inputMode="numeric"
+              value={userPin}
+              onChange={(e) => setUserPin(e.target.value)}
+              placeholder={userRole === "manager" ? "4 chiffres" : "optionnel"}
+            />
           </label>
           <div className={styles.manageActions}>
             <button className="btnGold" type="submit" disabled={manage.busyId === "user"}>
               Ajouter
             </button>
+          </div>
+        </form>
+      ) : null}
+      {editingId && organizationId ? (
+        <form className={styles.manageForm} onSubmit={saveEdit}>
+          <label className={styles.field}>
+            Nom
+            <input className={styles.fieldInput} value={editName} onChange={(e) => setEditName(e.target.value)} required />
+          </label>
+          <label className={styles.field}>
+            Rôle
+            <select className={styles.fieldInput} value={editRole} onChange={(e) => setEditRole(e.target.value)}>
+              <option value="employee">Employé</option>
+              <option value="manager">Manager</option>
+            </select>
+          </label>
+          <label className={styles.field}>
+            Activité
+            <select
+              className={styles.fieldInput}
+              value={editActive ? "active" : "inactive"}
+              onChange={(e) => setEditActive(e.target.value === "active")}
+            >
+              <option value="active">Actif</option>
+              <option value="inactive">Inactif</option>
+            </select>
+          </label>
+          <label className={styles.field}>
+            Nouveau mot de passe
+            <input
+              className={styles.fieldInput}
+              type="password"
+              autoComplete="new-password"
+              value={editPassword}
+              onChange={(e) => setEditPassword(e.target.value)}
+              placeholder="Laisser vide pour ne pas changer"
+            />
+          </label>
+          <label className={styles.field}>
+            Confirmer
+            <input
+              className={styles.fieldInput}
+              type="password"
+              autoComplete="new-password"
+              value={editPassword2}
+              onChange={(e) => setEditPassword2(e.target.value)}
+              placeholder="Si nouveau mot de passe"
+            />
+          </label>
+          {editRole === "manager" ? (
+            <label className={styles.field}>
+              Nouveau PIN
+              <input
+                className={styles.fieldInput}
+                inputMode="numeric"
+                value={editPin}
+                onChange={(e) => setEditPin(e.target.value)}
+                placeholder="Laisser vide pour ne pas changer"
+              />
+            </label>
+          ) : null}
+          <div className={styles.manageActions}>
+            <button className="btnGold" type="submit" disabled={manage.busy(editingId)}>
+              Enregistrer
+            </button>
+            <GhostButton onClick={() => setEditingId(null)}>Annuler</GhostButton>
           </div>
         </form>
       ) : null}
@@ -311,13 +486,18 @@ export function SettingsPage() {
                     <td>
                       {organizationId ? (
                         <RowActions>
+                          <GhostButton onClick={() => startEdit(u)}>Modifier</GhostButton>
                           <GhostButton
+                            disabled={manage.busy(u.id)}
                             onClick={async () => {
                               manage.setBusyId(u.id);
                               try {
-                                await patchOrgDoc(organizationId, "users", u.id, {
-                                  isActive: u.isActive === false,
-                                });
+                                await patchUser(
+                                  organizationId,
+                                  u.id,
+                                  { isActive: u.isActive === false },
+                                  u.linkedId
+                                );
                               } catch (err) {
                                 manage.setError(writeMessage(err));
                               } finally {

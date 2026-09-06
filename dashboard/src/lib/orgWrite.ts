@@ -45,12 +45,8 @@ export async function removeOrgDoc(
   await deleteDoc(orgDoc(organizationId, collectionName, id));
 }
 
-/** L’iPad écrit parfois l’UUID en majuscules, le site en minuscules : on efface les deux. */
-export async function removeUser(
-  organizationId: string,
-  id: string,
-  linkedId?: string
-): Promise<void> {
+/** L’iPad écrit parfois l’UUID en majuscules, le site en minuscules. */
+function userIdVariants(id: string, linkedId?: string): string[] {
   const variants = new Set<string>();
   for (const raw of [id, linkedId]) {
     const value = (raw || "").trim();
@@ -59,9 +55,32 @@ export async function removeUser(
     variants.add(value.toUpperCase());
     variants.add(value.toLowerCase());
   }
-  const results = await Promise.allSettled(
-    [...variants].map((docId) => removeOrgDoc(organizationId, "users", docId))
-  );
+  return [...variants];
+}
+
+export async function patchUser(
+  organizationId: string,
+  id: string,
+  data: DocumentData,
+  linkedId?: string
+): Promise<void> {
+  const ids = userIdVariants(id, linkedId);
+  const existing: string[] = [];
+  for (const docId of ids) {
+    const snap = await getDoc(orgDoc(organizationId, "users", docId));
+    if (snap.exists()) existing.push(docId);
+  }
+  const targets = existing.length > 0 ? existing : [id];
+  await Promise.all(targets.map((docId) => patchOrgDoc(organizationId, "users", docId, data)));
+}
+
+export async function removeUser(
+  organizationId: string,
+  id: string,
+  linkedId?: string
+): Promise<void> {
+  const ids = userIdVariants(id, linkedId);
+  const results = await Promise.allSettled(ids.map((docId) => removeOrgDoc(organizationId, "users", docId)));
   if (results.length === 0 || results.every((result) => result.status === "rejected")) {
     const first = results[0];
     throw first && first.status === "rejected" ? first.reason : new Error("Suppression impossible");
