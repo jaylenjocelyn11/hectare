@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import {
@@ -10,7 +10,7 @@ import {
   useManageState,
 } from "../components/ManageControls";
 import { useEquipment } from "../hooks/useEquipment";
-import { useOrgCollection } from "../hooks/useOrgCollection";
+import { useOrgCollection, type OrgDoc } from "../hooks/useOrgCollection";
 import { DEFAULT_ACCENT, NAV_ITEMS, resolveAccent, type NavKey } from "../lib/dashboards";
 import { formatDateTime } from "../lib/dates";
 import { getFirebaseFirestore } from "../lib/firebase";
@@ -21,6 +21,7 @@ import {
   patchOrgDoc,
   patchUser,
   removeEquipment,
+  removeOrgDoc,
   removeUser,
   writeMessage,
 } from "../lib/orgWrite";
@@ -47,6 +48,7 @@ type Schedule = {
   isActive?: boolean;
   targetHour?: number;
   targetMinute?: number;
+  equipmentIds?: unknown;
 };
 
 const SCHEDULE_TYPES = new Set(["morning", "afternoon", "evening"]);
@@ -57,6 +59,43 @@ function isUsableSchedule(s: Schedule): boolean {
   const name = asDisplayName(s.name, "");
   const hour = asNumber(s.targetHour);
   return !!name && name.length <= 40 && hour != null && hour >= 0 && hour <= 23;
+}
+
+function scheduleSlotKey(s: Schedule): string {
+  return `${asText(s.type, "").toLowerCase()}|${asNumber(s.targetHour) ?? -1}|${asNumber(s.targetMinute) ?? -1}`;
+}
+
+function equipmentCount(s: Schedule): number {
+  return Array.isArray(s.equipmentIds) ? s.equipmentIds.length : 0;
+}
+
+function pickKeeper(group: OrgDoc<Schedule>[]): OrgDoc<Schedule> {
+  return [...group].sort((a, b) => {
+    const byEq = equipmentCount(b) - equipmentCount(a);
+    if (byEq !== 0) return byEq;
+    const aOff = a.isActive === false ? 1 : 0;
+    const bOff = b.isActive === false ? 1 : 0;
+    if (aOff !== bOff) return aOff - bOff;
+    return a.id.localeCompare(b.id);
+  })[0];
+}
+
+function uniqueSchedules(docs: OrgDoc<Schedule>[]): OrgDoc<Schedule>[] {
+  const groups = new Map<string, OrgDoc<Schedule>[]>();
+  for (const s of docs.filter(isUsableSchedule)) {
+    const key = scheduleSlotKey(s);
+    const list = groups.get(key) ?? [];
+    list.push(s);
+    groups.set(key, list);
+  }
+  return [...groups.values()]
+    .map(pickKeeper)
+    .sort((a, b) => (asNumber(a.targetHour) ?? 99) - (asNumber(b.targetHour) ?? 99));
+}
+
+function extraScheduleIds(docs: OrgDoc<Schedule>[]): string[] {
+  const keep = new Set(uniqueSchedules(docs).map((s) => s.id));
+  return docs.filter(isUsableSchedule).filter((s) => !keep.has(s.id)).map((s) => s.id);
 }
 
 function pad(n: number): string {
@@ -70,6 +109,7 @@ export function SettingsPage() {
   const equipment = useEquipment(organizationId);
   const locationCategories = useOrgCollection<{ name?: string }>(organizationId, "locationCategories");
   const schedules = useOrgCollection<Schedule>(organizationId, "temperatureSchedules");
+  const pruningDupes = useRef(false);
   const [dashName, setDashName] = useState(dashboard?.name ?? "");
   const [tagline, setTagline] = useState(dashboard?.tagline ?? "Contrôle HACCP");
   const [accent, setAccent] = useState(resolveAccent(dashboard?.accent ?? DEFAULT_ACCENT));
@@ -107,6 +147,25 @@ export function SettingsPage() {
     setAccent(resolveAccent(dashboard.accent));
     setNav(dashboard.nav);
   }, [dashboard]);
+
+  useEffect(() => {
+    if (!organizationId || schedules.loading || pruningDupes.current) return;
+    const extras = extraScheduleIds(schedules.docs);
+    if (extras.length === 0) return;
+    pruningDupes.current = true;
+    void (async () => {
+      try {
+        await Promise.all(extras.map((id) => removeOrgDoc(organizationId, "temperatureSchedules", id)));
+        manage.setOk("Horaires en double retirés (l’iPad en recréait à chaque démarrage).");
+      } catch (err) {
+        manage.setError(writeMessage(err));
+      } finally {
+        pruningDupes.current = false;
+      }
+    })();
+    // manage est recréé à chaque render ; on ne l’écoute pas.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [organizationId, schedules.loading, schedules.docs]);
 
   async function saveLook(e: FormEvent) {
     e.preventDefault();
@@ -255,6 +314,13 @@ export function SettingsPage() {
   async function addSchedule(e: FormEvent) {
     e.preventDefault();
     if (!organizationId || !schedName.trim()) return;
+    const hour = Number(schedHour) || 8;
+    const minute = Number(schedMinute) || 0;
+    const slot = scheduleSlotKey({ type: schedType, targetHour: hour, targetMinute: minute });
+    if (schedules.docs.some((s) => isUsableSchedule(s) && scheduleSlotKey(s) === slot)) {
+      manage.setError("Cet horaire existe déjà (même moment et même heure).");
+      return;
+    }
     manage.setBusyId("sched");
     try {
       await createOrgDoc(organizationId, "temperatureSchedules", {
@@ -264,8 +330,8 @@ export function SettingsPage() {
         isActive: true,
         isOverdue: false,
         isTimeWindowActive: true,
-        targetHour: Number(schedHour) || 8,
-        targetMinute: Number(schedMinute) || 0,
+        targetHour: hour,
+        targetMinute: minute,
         toleranceMinutes: 30,
         equipmentIds: [],
         temperaturePoints: [],
@@ -718,7 +784,7 @@ export function SettingsPage() {
         </form>
       ) : null}
       {schedules.loading ? <p className="muted">Chargement…</p> : null}
-      {schedules.docs.filter(isUsableSchedule).length === 0 ? (
+      {uniqueSchedules(schedules.docs).length === 0 ? (
         <p className="muted">Aucun horaire de relevé.</p>
       ) : (
         <div className={styles.tableWrap}>
@@ -733,12 +799,12 @@ export function SettingsPage() {
               </tr>
             </thead>
             <tbody>
-              {[...schedules.docs]
-                .filter(isUsableSchedule)
-                .sort((a, b) => (asNumber(a.targetHour) ?? 99) - (asNumber(b.targetHour) ?? 99))
-                .map((s) => {
+              {uniqueSchedules(schedules.docs).map((s) => {
                 const h = asNumber(s.targetHour);
                 const m = asNumber(s.targetMinute);
+                const slotIds = schedules.docs
+                  .filter((d) => isUsableSchedule(d) && scheduleSlotKey(d) === scheduleSlotKey(s))
+                  .map((d) => d.id);
                 return (
                   <tr key={s.id}>
                     <td>{asDisplayName(s.name)}</td>
@@ -758,9 +824,13 @@ export function SettingsPage() {
                             onClick={async () => {
                               manage.setBusyId(s.id);
                               try {
-                                await patchOrgDoc(organizationId, "temperatureSchedules", s.id, {
-                                  isActive: s.isActive === false,
-                                });
+                                await Promise.all(
+                                  slotIds.map((id) =>
+                                    patchOrgDoc(organizationId, "temperatureSchedules", id, {
+                                      isActive: s.isActive === false,
+                                    })
+                                  )
+                                );
                               } catch (err) {
                                 manage.setError(writeMessage(err));
                               } finally {
@@ -770,15 +840,24 @@ export function SettingsPage() {
                           >
                             {s.isActive === false ? "Activer" : "Désactiver"}
                           </GhostButton>
-                          <DeleteControl
-                            organizationId={organizationId}
-                            collectionName="temperatureSchedules"
-                            id={s.id}
-                            label="cet horaire"
-                            busy={manage.busy(s.id)}
-                            onBusy={manage.setBusyId}
-                            onError={manage.setError}
-                          />
+                          <DangerButton
+                            disabled={manage.busy(s.id)}
+                            onClick={async () => {
+                              if (!window.confirm("Supprimer cet horaire ? L’iPad se mettra à jour tout seul.")) return;
+                              manage.setBusyId(s.id);
+                              try {
+                                await Promise.all(
+                                  slotIds.map((id) => removeOrgDoc(organizationId, "temperatureSchedules", id))
+                                );
+                              } catch (err) {
+                                manage.setError(writeMessage(err));
+                              } finally {
+                                manage.setBusyId(null);
+                              }
+                            }}
+                          >
+                            Supprimer
+                          </DangerButton>
                         </RowActions>
                       ) : null}
                     </td>
