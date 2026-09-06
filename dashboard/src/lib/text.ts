@@ -2,7 +2,7 @@ const UUID_RE =
   /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/;
 
 const CODE_RE =
-  /Optional\(|Hectare\.|Equipment\(|CorrectiveAction|persistentModelID|_\$backingData|"correctiveActions"|temperatureUnit|Objects are not valid/;
+  /Optional\(|Hectare\.|Equipment\(|TemperatureSchedule|TemperaturePoint|CorrectiveAction|persistentModelID|_\$backingData|"correctiveActions"|temperatureUnit|Objects are not valid/;
 
 function looksLikeCode(text: string): boolean {
   const t = text.trim();

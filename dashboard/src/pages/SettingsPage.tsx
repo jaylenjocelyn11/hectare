@@ -45,10 +45,19 @@ type Schedule = {
   name?: string;
   type?: string;
   isActive?: boolean;
-  isOverdue?: boolean;
   targetHour?: number;
   targetMinute?: number;
 };
+
+const SCHEDULE_TYPES = new Set(["morning", "afternoon", "evening"]);
+
+function isUsableSchedule(s: Schedule): boolean {
+  const type = asText(s.type, "").toLowerCase();
+  if (SCHEDULE_TYPES.has(type)) return true;
+  const name = asDisplayName(s.name, "");
+  const hour = asNumber(s.targetHour);
+  return !!name && name.length <= 40 && hour != null && hour >= 0 && hour <= 23;
+}
 
 function pad(n: number): string {
   return String(n).padStart(2, "0");
@@ -675,7 +684,10 @@ export function SettingsPage() {
         </div>
       )}
 
-      <h2 className={styles.h2}>Horaires de température</h2>
+      <h2 className={styles.h2}>Horaires de relevé</h2>
+      <p className={styles.meta}>
+        Moments de la journée où l’équipe doit prendre les températures (ex. matin 8:00, soir 18:00).
+      </p>
       {organizationId ? (
         <form className={styles.manageForm} onSubmit={addSchedule}>
           <label className={styles.field}>
@@ -705,8 +717,9 @@ export function SettingsPage() {
           </div>
         </form>
       ) : null}
-      {schedules.docs.length === 0 ? (
-        <p className="muted">Aucun horaire.</p>
+      {schedules.loading ? <p className="muted">Chargement…</p> : null}
+      {schedules.docs.filter(isUsableSchedule).length === 0 ? (
+        <p className="muted">Aucun horaire de relevé.</p>
       ) : (
         <div className={styles.tableWrap}>
           <table className={styles.table}>
@@ -714,24 +727,25 @@ export function SettingsPage() {
               <tr>
                 <th>Nom</th>
                 <th>Moment</th>
-                <th>Heure cible</th>
-                <th>Statut</th>
+                <th>Heure</th>
+                <th>Actif</th>
                 <th>Gestion</th>
               </tr>
             </thead>
             <tbody>
-              {schedules.docs.map((s) => {
+              {[...schedules.docs]
+                .filter(isUsableSchedule)
+                .sort((a, b) => (asNumber(a.targetHour) ?? 99) - (asNumber(b.targetHour) ?? 99))
+                .map((s) => {
                 const h = asNumber(s.targetHour);
                 const m = asNumber(s.targetMinute);
                 return (
                   <tr key={s.id}>
-                    <td>{asText(s.name)}</td>
+                    <td>{asDisplayName(s.name)}</td>
                     <td>{scheduleTypeLabel(s.type)}</td>
                     <td>{h != null && m != null ? `${pad(h)}:${pad(m)}` : "—"}</td>
                     <td>
-                      {s.isOverdue ? (
-                        <span className={styles.tagBad}>En retard</span>
-                      ) : s.isActive === false ? (
+                      {s.isActive === false ? (
                         <span className={styles.tagMuted}>Inactif</span>
                       ) : (
                         <span className={styles.tagOk}>Actif</span>
