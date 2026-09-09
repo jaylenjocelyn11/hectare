@@ -7,6 +7,7 @@ import { DashboardLayout } from "./pages/DashboardLayout";
 import { GroupsPage } from "./pages/GroupsPage";
 import { HomeRedirect } from "./pages/HomeRedirect";
 import { InventoryPage } from "./pages/InventoryPage";
+import { LossesPage } from "./pages/LossesPage";
 import { LoginPage } from "./pages/LoginPage";
 import { OverviewPage } from "./pages/OverviewPage";
 import { ProceduresPage } from "./pages/ProceduresPage";
@@ -26,6 +27,7 @@ const dashboardPages = (
     <Route path="procedures" element={<ProceduresPage />} />
     <Route path="recipes" element={<RecipesPage />} />
     <Route path="inventory" element={<InventoryPage />} />
+    <Route path="pertes" element={<LossesPage />} />
     <Route path="affectations" element={<AffectationsPage />} />
     <Route path="groups" element={<GroupsPage />} />
     <Route path="horaire" element={<SchedulePage />} />

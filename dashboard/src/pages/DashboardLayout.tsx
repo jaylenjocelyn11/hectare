@@ -12,6 +12,7 @@ import {
   IconSchedule,
   IconThermometer,
   IconAssign,
+  IconLoss,
 } from "../components/NavIcons";
 import { useAuth } from "../contexts/AuthContext";
 import { useDashboardSession } from "../hooks/useDashboardSession";
@@ -32,6 +33,7 @@ const ICONS = {
   procedures: IconChecklist,
   recipes: IconBook,
   inventory: IconBox,
+  losses: IconLoss,
   affectations: IconAssign,
   groups: IconPeople,
   schedule: IconSchedule,
