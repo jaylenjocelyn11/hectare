@@ -15,6 +15,7 @@ import {
   parseAffectationTasks,
   patchOrgDoc,
   purgeCompletedAffectationTasksForUser,
+  removeOrgDoc,
   writeMessage,
 } from "../lib/orgWrite";
 import { asText } from "../lib/text";
@@ -49,7 +50,7 @@ type TimePunch = {
   clockOutAt?: unknown;
 };
 
-type Pane = "lists" | "assign" | "follow";
+type Pane = "lists" | "follow";
 
 function newTaskId(): string {
   return crypto.randomUUID().toUpperCase();
@@ -65,8 +66,7 @@ export function AffectationsPage() {
   const [pane, setPane] = useState<Pane>("follow");
   const [listTitle, setListTitle] = useState("");
   const [listTasks, setListTasks] = useState("");
-  const [selectedListIds, setSelectedListIds] = useState<string[]>([]);
-  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [pickedByList, setPickedByList] = useState<Record<string, string[]>>({});
   const prevOpenIds = useRef<Set<string> | null>(null);
 
   const employees = useMemo(
@@ -142,39 +142,40 @@ export function AffectationsPage() {
     }
   }
 
-  async function assignLists(e: FormEvent) {
-    e.preventDefault();
+  async function assignList(listId: string) {
     if (!organizationId) return;
-    const chosenLists = activeLists.filter((list) => selectedListIds.includes(list.id));
-    const chosenUsers = employees.filter((user) => selectedUserIds.includes(user.id));
-    if (chosenLists.length === 0 || chosenUsers.length === 0) {
-      manage.setError("Choisis au moins une liste et un employé.");
+    const list = activeLists.find((item) => item.id === listId);
+    const chosenUsers = employees.filter((user) => (pickedByList[listId] ?? []).includes(user.id));
+    if (!list || chosenUsers.length === 0) {
+      manage.setError("Choisis au moins un employé.");
       return;
     }
-    manage.setBusyId("assign");
+    manage.setBusyId(`assign-${listId}`);
     try {
-      for (const list of chosenLists) {
-        const template = parseAffectationTasks(list.tasks).map((task) => ({
-          id: newTaskId(),
-          title: task.title,
-          isCompleted: false,
-          completedAt: null,
-        }));
-        for (const user of chosenUsers) {
-          await createOrgDoc(organizationId, "affectationAssignments", {
-            listId: list.id,
-            listTitle: asText(list.title, "Liste"),
-            assigneeUserId: user.id,
-            assigneeName: asText(user.name, "Employé"),
-            assignedByUserId: "",
-            assignedByName: "Tableau de bord",
-            tasks: template,
-          });
-        }
+      const template = parseAffectationTasks(list.tasks).map((task) => ({
+        id: newTaskId(),
+        title: task.title,
+        isCompleted: false,
+        completedAt: null,
+      }));
+      for (const user of chosenUsers) {
+        await createOrgDoc(organizationId, "affectationAssignments", {
+          listId: list.id,
+          listTitle: asText(list.title, "Liste"),
+          assigneeUserId: user.id,
+          assigneeName: asText(user.name, "Employé"),
+          assignedByUserId: "",
+          assignedByName: "Tableau de bord",
+          tasks: template,
+        });
       }
-      setSelectedListIds([]);
-      setSelectedUserIds([]);
-      manage.setOk("Listes assignées. Elles apparaissent sur iPhone et iPad.");
+      await removeOrgDoc(organizationId, "affectationLists", list.id);
+      setPickedByList((prev) => {
+        const next = { ...prev };
+        delete next[listId];
+        return next;
+      });
+      manage.setOk("Liste assignée. Elle a été retirée des brouillons.");
       setPane("follow");
     } catch (err) {
       manage.setError(writeMessage(err));
@@ -203,16 +204,20 @@ export function AffectationsPage() {
     }
   }
 
-  function toggleId(list: string[], id: string, setter: (next: string[]) => void) {
-    setter(list.includes(id) ? list.filter((item) => item !== id) : [...list, id]);
+  function toggleUser(listId: string, userId: string) {
+    setPickedByList((prev) => {
+      const current = prev[listId] ?? [];
+      const next = current.includes(userId) ? current.filter((id) => id !== userId) : [...current, userId];
+      return { ...prev, [listId]: next };
+    });
   }
 
   return (
     <PageShell errors={[users.error, lists.error, assignments.error, punches.error]}>
       <h1 className={styles.h1}>Affectation</h1>
       <p className={styles.meta}>
-        Assigne des listes de tâches aux employés. Une tâche terminée reste visible jusqu’à la fin du
-        quart (pointage de sortie), puis elle est retirée.
+        Crée une liste, assigne-la, puis elle disparaît des brouillons. Les tâches terminées sont
+        retirées au pointage de sortie.
       </p>
       <ManageNotice error={manage.error} ok={manage.ok} />
 
@@ -236,7 +241,6 @@ export function AffectationsPage() {
           [
             ["follow", "Suivi"],
             ["lists", "Listes"],
-            ["assign", "Assigner"],
           ] as const
         ).map(([key, label]) => (
           <button
@@ -278,23 +282,25 @@ export function AffectationsPage() {
             </label>
             <div className={styles.manageActions}>
               <button className="btnGold" type="submit" disabled={manage.busyId === "list-new"}>
-                Créer la liste
+                Créer
               </button>
             </div>
           </form>
 
-          <h2 className={styles.h2}>Listes enregistrées</h2>
+          <h2 className={styles.h2}>En attente</h2>
           {lists.loading ? <p className="muted">Chargement…</p> : null}
           {activeLists.length === 0 ? (
-            <p className="muted">Aucune liste. Crée-en une ci-dessus.</p>
+            <p className="muted">Aucune liste. Crée-en une, puis assigne-la à l’équipe.</p>
           ) : (
-            <div className={styles.stack}>
+            <div className={styles.draftStack}>
               {activeLists.map((list) => {
                 const tasks = parseAffectationTasks(list.tasks);
+                const picked = pickedByList[list.id] ?? [];
                 return (
-                  <article key={list.id} className={styles.card}>
-                    <div className={styles.cardHead}>
-                      <strong>{asText(list.title, "Liste")}</strong>
+                  <article key={list.id} className={styles.draftCard}>
+                    <div className={styles.draftHead}>
+                      <h3 className={styles.draftTitle}>{asText(list.title, "Liste")}</h3>
+                      <span className={styles.draftCount}>{tasks.length}</span>
                       {organizationId ? (
                         <DeleteControl
                           organizationId={organizationId}
@@ -307,67 +313,40 @@ export function AffectationsPage() {
                         />
                       ) : null}
                     </div>
-                    <p className={styles.hint}>{tasks.length} tâche(s)</p>
-                    <ul className={styles.list}>
+                    <ol className={styles.draftTasks}>
                       {tasks.map((task) => (
                         <li key={task.id}>{task.title}</li>
                       ))}
-                    </ul>
+                    </ol>
+                    <p className={styles.draftLabel}>Assigner à</p>
+                    <div className={styles.peopleChips}>
+                      {employees.map((user) => {
+                        const on = picked.includes(user.id);
+                        return (
+                          <button
+                            key={user.id}
+                            type="button"
+                            className={on ? styles.chipOn : styles.chip}
+                            onClick={() => toggleUser(list.id, user.id)}
+                          >
+                            {asText(user.name, "Employé")}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <button
+                      className="btnGold"
+                      type="button"
+                      disabled={manage.busyId === `assign-${list.id}` || picked.length === 0}
+                      onClick={() => void assignList(list.id)}
+                    >
+                      Assigner
+                    </button>
                   </article>
                 );
               })}
             </div>
           )}
-        </>
-      ) : null}
-
-      {pane === "assign" ? (
-        <>
-          <h2 className={styles.h2}>Assigner des listes</h2>
-          <form className={styles.manageForm} onSubmit={assignLists}>
-            <fieldset className={`${styles.fieldset} ${styles.spanAll}`}>
-              <legend>Listes</legend>
-              {activeLists.length === 0 ? (
-                <p className={styles.hint}>Crée d’abord une liste.</p>
-              ) : (
-                activeLists.map((list) => (
-                  <label key={list.id} className={styles.checkRow}>
-                    <input
-                      type="checkbox"
-                      checked={selectedListIds.includes(list.id)}
-                      onChange={() => toggleId(selectedListIds, list.id, setSelectedListIds)}
-                    />
-                    {asText(list.title, "Liste")} ({parseAffectationTasks(list.tasks).length})
-                  </label>
-                ))
-              )}
-            </fieldset>
-            <fieldset className={`${styles.fieldset} ${styles.spanAll}`}>
-              <legend>Employés</legend>
-              {employees.length === 0 ? (
-                <p className={styles.hint}>Aucun utilisateur actif.</p>
-              ) : (
-                employees.map((user) => (
-                  <label key={user.id} className={styles.checkRow}>
-                    <input
-                      type="checkbox"
-                      checked={selectedUserIds.includes(user.id)}
-                      onChange={() => toggleId(selectedUserIds, user.id, setSelectedUserIds)}
-                    />
-                    {asText(user.name, "Employé")}{" "}
-                    <span className={styles.hint}>
-                      {asText(user.role) === "manager" ? "Manager" : "Employé"}
-                    </span>
-                  </label>
-                ))
-              )}
-            </fieldset>
-            <div className={styles.manageActions}>
-              <button className="btnGold" type="submit" disabled={manage.busyId === "assign"}>
-                Assigner
-              </button>
-            </div>
-          </form>
         </>
       ) : null}
 

@@ -843,3 +843,88 @@ button.rosterMe {
   color: var(--muted);
 }
 
+.draftStack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.draftCard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1rem 1.1rem 1.1rem;
+}
+
+.draftHead {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.draftTitle {
+  margin: 0;
+  flex: 1;
+  font-family: var(--serif);
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--gold-soft);
+}
+
+.draftCount {
+  min-width: 1.6rem;
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--gold);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.15rem 0.5rem;
+}
+
+.draftTasks {
+  margin: 0.7rem 0 0.85rem;
+  padding-left: 1.15rem;
+  color: var(--text);
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+.draftTasks li + li {
+  margin-top: 0.2rem;
+}
+
+.draftLabel {
+  margin: 0 0 0.45rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.peopleChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-bottom: 0.9rem;
+}
+
+.chip,
+.chipOn {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.82rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.chipOn {
+  color: #111;
+  background: linear-gradient(135deg, var(--gold), var(--gold-soft));
+  border-color: transparent;
+  font-weight: 600;
+}
+
