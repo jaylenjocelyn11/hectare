@@ -10,7 +10,7 @@ import {
 } from "../components/ManageControls";
 import { useOrgCollection } from "../hooks/useOrgCollection";
 import { asDate, formatDateTime, isSameLocalDay } from "../lib/dates";
-import { createOrgDoc, patchOrgDoc, writeMessage } from "../lib/orgWrite";
+import { createOrgDoc, patchOrgDoc, purgeCompletedAffectationTasksForUser, writeMessage } from "../lib/orgWrite";
 import { asText } from "../lib/text";
 import type { OrgContext } from "./orgContext";
 import { PageShell } from "./PageShell";
@@ -166,6 +166,9 @@ export function TimePunchesPage() {
         note: "",
         source: "web",
       });
+      if (clockOut) {
+        await purgeCompletedAffectationTasksForUser(organizationId, manualUserId);
+      }
       setManualIn("");
       setManualOut("");
       manage.setOk("Pointage ajouté.");
@@ -195,6 +198,11 @@ export function TimePunchesPage() {
         clockOutAt: clockOut ? Timestamp.fromDate(clockOut) : null,
         note: editNote.trim(),
       });
+      if (clockOut) {
+        const punch = punches.docs.find((item) => item.id === id);
+        const userId = asText(punch?.userId);
+        if (userId) await purgeCompletedAffectationTasksForUser(organizationId, userId);
+      }
       setEditId(null);
       manage.setOk("Pointage mis à jour.");
     } catch (err) {

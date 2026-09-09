@@ -1,4 +1,4 @@
-import { deleteDoc, doc, getDoc, serverTimestamp, setDoc, type DocumentData } from "firebase/firestore";
+import { collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc, type DocumentData } from "firebase/firestore";
 import { getFirebaseFirestore } from "./firebase";
 
 export function newOrgId(): string {
@@ -160,4 +160,52 @@ export async function saveProcedureTemplate(
         : "";
   payload.locationCategoryId = nextLocation;
   await setDoc(ref, payload);
+}
+
+export type AffectationTask = {
+  id: string;
+  title: string;
+  isCompleted?: boolean;
+  completedAt?: unknown;
+};
+
+export function parseAffectationTasks(value: unknown): AffectationTask[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const rec = item as Record<string, unknown>;
+    const title = typeof rec.title === "string" ? rec.title.trim() : "";
+    if (!title) return [];
+    return [
+      {
+        id: typeof rec.id === "string" && rec.id.trim() ? rec.id : crypto.randomUUID(),
+        title,
+        isCompleted: rec.isCompleted === true,
+        completedAt: rec.completedAt ?? null,
+      },
+    ];
+  });
+}
+
+export async function purgeCompletedAffectationTasksForUser(
+  organizationId: string,
+  userId: string
+): Promise<void> {
+  const uid = userId.trim().toLowerCase();
+  if (!organizationId || !uid) return;
+  const snap = await getDocs(collection(getFirebaseFirestore(), "organizations", organizationId, "affectationAssignments"));
+  await Promise.all(
+    snap.docs.map(async (document) => {
+      const data = document.data();
+      const assignee = String(data.assigneeUserId || "").toLowerCase();
+      if (assignee !== uid) return;
+      const tasks = parseAffectationTasks(data.tasks);
+      const remaining = tasks.filter((task) => !task.isCompleted);
+      if (remaining.length === 0) {
+        await removeOrgDoc(organizationId, "affectationAssignments", document.id);
+      } else if (remaining.length !== tasks.length) {
+        await patchOrgDoc(organizationId, "affectationAssignments", document.id, { tasks: remaining });
+      }
+    })
+  );
 }

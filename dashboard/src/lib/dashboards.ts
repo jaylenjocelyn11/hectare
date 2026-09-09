@@ -8,6 +8,7 @@ export const NAV_ITEMS = [
   { key: "procedures", path: "procedures", label: "Procédures" },
   { key: "recipes", path: "recipes", label: "Recettes" },
   { key: "inventory", path: "inventory", label: "Inventaire" },
+  { key: "affectations", path: "affectations", label: "Affectation" },
   { key: "groups", path: "groups", label: "Groupe" },
   { key: "schedule", path: "horaire", label: "Horaire" },
   { key: "pointages", path: "pointages", label: "Pointages" },

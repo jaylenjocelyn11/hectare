@@ -11,6 +11,7 @@ import {
   IconClock,
   IconSchedule,
   IconThermometer,
+  IconAssign,
 } from "../components/NavIcons";
 import { useAuth } from "../contexts/AuthContext";
 import { useDashboardSession } from "../hooks/useDashboardSession";
@@ -31,6 +32,7 @@ const ICONS = {
   procedures: IconChecklist,
   recipes: IconBook,
   inventory: IconBox,
+  affectations: IconAssign,
   groups: IconPeople,
   schedule: IconSchedule,
   pointages: IconClock,

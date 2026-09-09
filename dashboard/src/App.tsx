@@ -16,6 +16,7 @@ import { SchedulePage } from "./pages/SchedulePage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { TemperaturesPage } from "./pages/TemperaturesPage";
 import { TimePunchesPage } from "./pages/TimePunchesPage";
+import { AffectationsPage } from "./pages/AffectationsPage";
 import { apexOrigin, tenantSlugFromHost } from "./lib/dashboards";
 
 const dashboardPages = (
@@ -25,6 +26,7 @@ const dashboardPages = (
     <Route path="procedures" element={<ProceduresPage />} />
     <Route path="recipes" element={<RecipesPage />} />
     <Route path="inventory" element={<InventoryPage />} />
+    <Route path="affectations" element={<AffectationsPage />} />
     <Route path="groups" element={<GroupsPage />} />
     <Route path="horaire" element={<SchedulePage />} />
     <Route path="pointages" element={<TimePunchesPage />} />

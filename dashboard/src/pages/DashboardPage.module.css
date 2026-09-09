@@ -817,6 +817,24 @@ button.rosterMe {
   grid-column: 1 / -1;
 }
 
+.spanAll {
+  grid-column: 1 / -1;
+}
+
+.taskRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.45rem 0;
+  border-top: 1px solid color-mix(in srgb, var(--gold) 10%, transparent);
+}
+
+.taskDone {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
 .checkInline {
   display: flex;
   align-items: center;

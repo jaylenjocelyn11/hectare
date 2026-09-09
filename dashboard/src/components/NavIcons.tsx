@@ -103,6 +103,16 @@ export function IconSchedule(p: IconProps) {
   );
 }
 
+export function IconAssign(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M8 7h11M8 12h11M8 17h7" />
+      <path d="M4 7h.01M4 12h.01M4 17h.01" />
+      <rect x="3" y="3" width="18" height="18" rx="3" />
+    </Svg>
+  );
+}
+
 export function IconGear(p: IconProps) {
   return (
     <Svg {...p}>

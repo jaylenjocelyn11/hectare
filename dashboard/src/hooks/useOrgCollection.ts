@@ -22,6 +22,8 @@ const SMALL_COLLECTIONS = new Set([
   "employeeSchedules",
   "locationCategories",
   "timePunches",
+  "affectationLists",
+  "affectationAssignments",
 ]);
 
 const HEAVY_KEYS = new Set([
