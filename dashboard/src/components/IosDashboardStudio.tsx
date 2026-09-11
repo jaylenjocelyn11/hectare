@@ -19,6 +19,7 @@ import {
   type IosWidgetType,
 } from "../lib/iosDashboardLayout";
 import type { useIosDashboardLayout } from "../hooks/useIosDashboardLayout";
+import { IosNativeWidget, type IosLiveSnapshot } from "./IosNativeWidgets";
 import styles from "./IosDashboardStudio.module.css";
 
 type StudioProps = {
@@ -26,6 +27,7 @@ type StudioProps = {
   saveState: ReturnType<typeof useIosDashboardLayout>["saveState"];
   error: string | null;
   setLayout: ReturnType<typeof useIosDashboardLayout>["setLayout"];
+  live?: IosLiveSnapshot;
 };
 
 type DragSession = {
@@ -39,7 +41,7 @@ type DragSession = {
   pointerY: number;
 };
 
-export function IosDashboardStudio({ layouts, saveState, error, setLayout }: StudioProps) {
+export function IosDashboardStudio({ layouts, saveState, error, setLayout, live }: StudioProps) {
   const [device, setDevice] = useState<IosDeviceKind>("ipad");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drag, setDrag] = useState<DragSession | null>(null);
@@ -363,15 +365,16 @@ export function IosDashboardStudio({ layouts, saveState, error, setLayout }: Stu
                 style={{ ["--cols" as string]: String(preview.columns), ["--rows" as string]: String(rows) }}
               >
                 {preview.widgets.map((widget) => (
-                  <BoardTile
-                    key={widget.id}
-                    widget={widget}
-                    columns={preview.columns}
-                    rows={rows}
-                    selected={selected?.id === widget.id}
-                    dragging={drag?.id === widget.id || drag?.fromPalette === widget.type}
-                    swapTarget={swapTarget?.id === widget.id}
-                    onSelect={() => setSelectedId(widget.id)}
+                    <BoardTile
+                      key={widget.id}
+                      widget={widget}
+                      columns={preview.columns}
+                      rows={rows}
+                      selected={selected?.id === widget.id}
+                      dragging={drag?.id === widget.id || drag?.fromPalette === widget.type}
+                      swapTarget={swapTarget?.id === widget.id}
+                      live={live}
+                      onSelect={() => setSelectedId(widget.id)}
                     onPointerDown={(event) => {
                       const source = layout.widgets.find((item) => item.id === widget.id);
                       if (source) startTileDrag(event, source);
@@ -452,6 +455,7 @@ function BoardTile({
   selected,
   dragging,
   swapTarget,
+  live,
   onSelect,
   onPointerDown,
   onResize,
@@ -462,13 +466,12 @@ function BoardTile({
   selected: boolean;
   dragging: boolean;
   swapTarget: boolean;
+  live?: IosLiveSnapshot;
   onSelect: () => void;
   onPointerDown: (event: React.PointerEvent) => void;
   onResize: (w: number, h: number) => void;
 }) {
-  const item = catalogItem(widget.type);
   const title = widgetTitle(widget.type, widget.title);
-  const tone = widgetTone(widget.type);
 
   const style = useMemo(
     () =>
@@ -493,8 +496,8 @@ function BoardTile({
 
   return (
     <article className={className} style={style} onPointerDown={onPointerDown} onClick={onSelect}>
-      <div className={`${styles.face} ${styles[tone]}`}>
-        <WidgetPreview type={widget.type} title={title} />
+      <div className={styles.face}>
+        <IosNativeWidget type={widget.type} title={title} live={live} phone={columns === 2} />
         {!widget.visible ? <p className={styles.hiddenTag}>Cachée sur le téléphone</p> : null}
       </div>
       <button
@@ -512,154 +515,6 @@ function BoardTile({
         onPointerDown={(event) => beginResize(event, "h", widget, onResize)}
       />
     </article>
-  );
-}
-
-function widgetTone(type: IosWidgetType): "faceLight" | "faceDark" | "faceGold" {
-  if (type === "timeClock" || type === "complianceScore") return "faceDark";
-  if (type === "inventoryAlerts" || type === "procedurePerformance") return "faceGold";
-  return "faceLight";
-}
-
-function WidgetPreview({ type, title }: { type: IosWidgetType; title: string }) {
-  return (
-    <>
-      <header className={styles.cardHead}>
-        <h3>{title}</h3>
-        <span className={styles.more} aria-hidden="true">
-          ···
-        </span>
-      </header>
-      {type === "greeting" ? (
-        <div className={styles.previewBody}>
-          <p className={styles.heroMetric}>Bonjour</p>
-          <p className={styles.mutedLine}>Vendredi 11 septembre</p>
-        </div>
-      ) : null}
-      {type === "metrics" ? (
-        <div className={styles.statRow}>
-          <div>
-            <strong>12</strong>
-            <span>Relevés</span>
-          </div>
-          <div>
-            <strong>4</strong>
-            <span>Tâches</span>
-          </div>
-          <div>
-            <strong>98%</strong>
-            <span>OK</span>
-          </div>
-        </div>
-      ) : null}
-      {type === "timeClock" ? (
-        <div className={styles.ringWrap}>
-          <div className={styles.ring} />
-          <div className={styles.ringLabel}>
-            <strong>08:12</strong>
-            <span>En service</span>
-          </div>
-        </div>
-      ) : null}
-      {type === "equipment" ? (
-        <ul className={styles.miniList}>
-          <li>
-            <span>Chambre froide</span>
-            <em className={styles.pillOk}>OK</em>
-          </li>
-          <li>
-            <span>Four 1</span>
-            <em className={styles.pillWarn}>Surveiller</em>
-          </li>
-        </ul>
-      ) : null}
-      {type === "procedures" ? (
-        <div className={styles.previewBody}>
-          <div className={styles.taskCard}>
-            <p>Ouverture cuisine</p>
-            <div className={styles.bar}>
-              <i style={{ width: "70%" }} />
-            </div>
-            <span>7 / 10</span>
-          </div>
-        </div>
-      ) : null}
-      {type === "notes" ? (
-        <ul className={styles.miniList}>
-          <li>
-            <span>Livraison poisson</span>
-            <em className={styles.pillMuted}>10:20</em>
-          </li>
-          <li>
-            <span>Filtre à changer</span>
-            <em className={styles.pillMuted}>Hier</em>
-          </li>
-        </ul>
-      ) : null}
-      {type === "temperatureOverview" ? (
-        <div className={styles.previewBody}>
-          <p className={styles.heroMetric}>
-            3° <span>hors plage</span>
-          </p>
-          <div className={styles.bar}>
-            <i className={styles.barWarn} style={{ width: "22%" }} />
-          </div>
-        </div>
-      ) : null}
-      {type === "procedureStatus" ? (
-        <ul className={styles.miniList}>
-          <li>
-            <span>Terminées</span>
-            <em className={styles.pillOk}>8</em>
-          </li>
-          <li>
-            <span>En cours</span>
-            <em className={styles.pillWarn}>2</em>
-          </li>
-        </ul>
-      ) : null}
-      {type === "inventoryAlerts" ? (
-        <div className={styles.statRow}>
-          <div>
-            <strong>2</strong>
-            <span>Expirés</span>
-          </div>
-          <div>
-            <strong>5</strong>
-            <span>Bientôt</span>
-          </div>
-        </div>
-      ) : null}
-      {type === "complianceScore" ? (
-        <div className={styles.ringWrap}>
-          <div className={`${styles.ring} ${styles.ringOk}`} />
-          <div className={styles.ringLabel}>
-            <strong>96%</strong>
-            <span>Score HACCP</span>
-          </div>
-        </div>
-      ) : null}
-      {type === "temperatureTrends" ? (
-        <div className={styles.bars}>
-          <i style={{ height: "42%" }} />
-          <i style={{ height: "70%" }} />
-          <i style={{ height: "55%" }} />
-          <i style={{ height: "88%" }} />
-        </div>
-      ) : null}
-      {type === "procedurePerformance" ? (
-        <div className={styles.statRow}>
-          <div>
-            <strong>94%</strong>
-            <span>Réussite</span>
-          </div>
-          <div>
-            <strong>18m</strong>
-            <span>Durée</span>
-          </div>
-        </div>
-      ) : null}
-    </>
   );
 }
 

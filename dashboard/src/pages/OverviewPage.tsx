@@ -1,12 +1,14 @@
+import { useMemo } from "react";
 import { useOutletContext } from "react-router-dom";
 import { IosDashboardStudio } from "../components/IosDashboardStudio";
+import type { IosLiveSnapshot } from "../components/IosNativeWidgets";
 import { LocationCategoriesSection } from "../components/LocationCategoriesSection";
 import { ManageNotice, useManageState } from "../components/ManageControls";
 import { useEquipment } from "../hooks/useEquipment";
 import { useIosDashboardLayout } from "../hooks/useIosDashboardLayout";
 import { useOrgCollection } from "../hooks/useOrgCollection";
 import { asDate, formatDateTime, isSameLocalDay } from "../lib/dates";
-import { asText, namedFromDocs } from "../lib/text";
+import { asDisplayName, asNumber, asText, namedFromDocs } from "../lib/text";
 import type { OrgContext } from "./orgContext";
 import styles from "./DashboardPage.module.css";
 
@@ -32,6 +34,12 @@ type ProcedureTemplate = {
   name?: string;
 };
 
+type Note = {
+  title?: string;
+  content?: string;
+  createdAt?: unknown;
+};
+
 export function OverviewPage() {
   const { organizationId, resolving, error: orgError } = useOutletContext<OrgContext>();
   const iosLayout = useIosDashboardLayout(organizationId);
@@ -42,12 +50,17 @@ export function OverviewPage() {
     organizationId,
     "procedureTemplates"
   );
+  const notes = useOrgCollection<Note>(organizationId, "notes");
   const manage = useManageState();
 
   const listenError =
-    equipment.error || readings.error || runs.error || templates.error;
+    equipment.error || readings.error || runs.error || templates.error || notes.error;
   const loadingLists =
-    equipment.loading || readings.loading || runs.loading || templates.loading;
+    equipment.loading ||
+    readings.loading ||
+    runs.loading ||
+    templates.loading ||
+    notes.loading;
 
   const today = new Date();
   const readingsToday = readings.docs.filter((r) => {
@@ -87,6 +100,86 @@ export function OverviewPage() {
     day: "numeric",
     month: "long",
   });
+
+  const iosLive = useMemo((): IosLiveSnapshot => {
+    const completedToday = runs.docs.filter((r) => {
+      const d = asDate(r.startTime) ?? asDate(r.date);
+      return d && isSameLocalDay(d, today) && asText(r.status, "").toLowerCase() === "completed";
+    }).length;
+    const pendingToday = runs.docs.filter((r) => {
+      const d = asDate(r.startTime) ?? asDate(r.date);
+      const s = asText(r.status, "").toLowerCase();
+      return d && isSameLocalDay(d, today) && (s === "inprogress" || s === "running" || s === "paused");
+    }).length;
+    const temps = readingsToday
+      .map((r) => asNumber(r.temperature))
+      .filter((n): n is number => n != null);
+    const avgTemp = temps.length ? temps.reduce((a, b) => a + b, 0) / temps.length : null;
+    const compliance =
+      readingsToday.length === 0
+        ? 100
+        : Math.round(((readingsToday.length - outOfRangeToday) / readingsToday.length) * 100);
+
+    const latestByEquipment = new Map<string, { temp: number; ok: boolean }>();
+    for (const r of readings.docs) {
+      const id = asText(r.equipmentId, "");
+      if (!id) continue;
+      const d = asDate(r.timestamp) ?? asDate(r.date);
+      if (!d || !isSameLocalDay(d, today)) continue;
+      const temp = asNumber(r.temperature);
+      if (temp == null) continue;
+      latestByEquipment.set(id, { temp, ok: !r.isOutOfRange });
+    }
+
+    return {
+      dayName: today.toLocaleDateString("fr-CA", { weekday: "long" }),
+      monthName: today.toLocaleDateString("fr-CA", { day: "numeric", month: "long" }),
+      readingsToday: readingsToday.length,
+      outOfRange: outOfRangeToday,
+      avgTemp,
+      completedProcedures: completedToday,
+      pendingProcedures: pendingToday,
+      overdueRuns,
+      activeEquipment,
+      compliance,
+      equipment: equipment.list.slice(0, 3).map((item) => {
+        const latest = latestByEquipment.get(item.id);
+        const kind = asDisplayName(item.kind ?? item.type, "ambient");
+        return {
+          name: asDisplayName(item.name, "Équipement"),
+          kind,
+          temp: latest ? `${Math.round(latest.temp)}°C` : null,
+          ok: latest?.ok ?? true,
+        };
+      }),
+      procedures: latestRuns.slice(0, 3).map((r) => ({
+        name: namedFromDocs(templates.docs, r.procedureTemplateId, "Procédure"),
+        status: asText(r.status, ""),
+      })),
+      notes: [...notes.docs]
+        .sort((a, b) => {
+          const da = asDate(a.createdAt);
+          const db = asDate(b.createdAt);
+          return (db?.getTime() ?? 0) - (da?.getTime() ?? 0);
+        })
+        .slice(0, 3)
+        .map((n) => ({
+          title: asDisplayName(n.title || n.content, "Note"),
+          when: formatDateTime(n.createdAt),
+        })),
+    };
+  }, [
+    activeEquipment,
+    equipment.list,
+    latestRuns,
+    notes.docs,
+    outOfRangeToday,
+    overdueRuns,
+    readings.docs,
+    readingsToday,
+    templates.docs,
+    today,
+  ]);
 
   return (
     <>
@@ -142,6 +235,7 @@ export function OverviewPage() {
               saveState={iosLayout.saveState}
               error={iosLayout.error}
               setLayout={iosLayout.setLayout}
+              live={iosLive}
             />
           ) : null}
           <LocationCategoriesSection organizationId={organizationId} manage={manage} />

@@ -1,0 +1,291 @@
+.stack,
+.clock,
+.kv,
+.rows,
+.metricsPhone,
+.metricsPad {
+  height: 100%;
+  min-height: 0;
+}
+
+.hello {
+  margin: 0;
+  font-size: 1.45rem;
+  font-weight: 700;
+  background: linear-gradient(90deg, #fff, #8cb8b8);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.stackPad {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.stackPhone {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sub {
+  margin: 0;
+  color: #8a9a9c;
+  font-size: 0.78rem;
+}
+
+.dateChip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.iconCircle {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(80, 104, 104, 0.22);
+  color: #8cb8b8;
+  font-size: 0.7rem;
+}
+
+.dateDay {
+  margin: 0;
+  color: #8cb8b8;
+  font-weight: 700;
+}
+
+.metricsPad {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.metricsPhone {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.metric,
+.compliance {
+  background: #1a2222;
+  border: 1px solid rgba(80, 104, 104, 0.2);
+  border-radius: 12px;
+  padding: 10px 12px;
+  box-shadow: 0 8px 12px rgba(0, 0, 0, 0.25);
+}
+
+.metricIcon {
+  font-size: 0.7rem;
+}
+
+.metricValue {
+  margin: 4px 0 2px;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.metricTitle,
+.sectionTitle {
+  margin: 0;
+  color: #fff;
+  font-size: 0.92rem;
+  font-weight: 650;
+}
+
+.metricTitle {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: #8a9a9c;
+}
+
+.compliance {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.compliance strong {
+  font-size: 1.4rem;
+}
+
+.clockTitle {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  background: linear-gradient(90deg, #fff, #8cb8b8);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.eqIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.eqCold {
+  background: rgba(26, 128, 204, 0.2) radial-gradient(circle at center, #1a80cc 0 5px, transparent 6px);
+}
+
+.eqHot {
+  background: rgba(230, 69, 69, 0.2) radial-gradient(circle at center, #e64545 0 5px, transparent 6px);
+}
+
+.ring {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: conic-gradient(#33b34d calc(var(--p, 100) * 1%), rgba(255, 255, 255, 0.12) 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent 62%, #000 64%);
+  mask: radial-gradient(farthest-side, transparent 62%, #000 64%);
+}
+
+.clockHint {
+  margin: 8px 0 12px;
+  color: #8a9a9c;
+}
+
+.punch {
+  display: grid;
+  place-items: center;
+  min-height: 72px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #33b34d, #248a3a);
+  color: #fff;
+  font-weight: 700;
+  font-size: 1.05rem;
+  box-shadow: 0 6px 12px rgba(36, 138, 58, 0.35);
+}
+
+.rowHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.badge,
+.linkish {
+  font-size: 0.72rem;
+  color: #8cb8b8;
+  border: 1px solid rgba(80, 104, 104, 0.3);
+  border-radius: 8px;
+  padding: 2px 8px;
+  background: rgba(80, 104, 104, 0.12);
+}
+
+.rows,
+.kv {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.rows li,
+.kv li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.grow {
+  min-width: 0;
+  flex: 1;
+}
+
+.grow strong,
+.kv b {
+  display: block;
+  color: #fff;
+  font-size: 0.88rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.grow em {
+  display: block;
+  color: #8a9a9c;
+  font-size: 0.72rem;
+  font-style: normal;
+}
+
+.kv span {
+  color: #8a9a9c;
+  font-size: 0.78rem;
+}
+
+.empty {
+  margin: 18px 0 0;
+  text-align: center;
+  color: #8a9a9c;
+}
+
+.ok {
+  color: #33b34d;
+}
+
+.warn {
+  color: #e6a328;
+}
+
+.err {
+  color: #e64545;
+}
+
+.info {
+  color: #1a80cc;
+}
+
+.dotInfo,
+.dotHot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dotInfo {
+  background: #1a80cc;
+}
+
+.dotHot {
+  background: #e64545;
+}
+
+@container (max-height: 110px) {
+  .metricsPad,
+  .metricsPhone {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .punch {
+    min-height: 44px;
+    font-size: 0.88rem;
+  }
+
+  .rows li:nth-child(n + 3),
+  .kv li:nth-child(n + 3),
+  .sub,
+  .clockHint {
+    display: none;
+  }
+}
