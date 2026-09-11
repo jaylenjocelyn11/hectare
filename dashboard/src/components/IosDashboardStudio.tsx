@@ -356,42 +356,29 @@ export function IosDashboardStudio({ layouts, saveState, error, setLayout }: Stu
         <div className={`${styles.stage} ${device === "iphone" ? styles.stagePhone : styles.stagePad}`}>
           <p className={drag ? styles.coachLive : styles.coach}>{coach}</p>
           <div className={styles.deviceFrame}>
-            <div className={styles.bezel} data-device={device}>
-              <span className={styles.camera} aria-hidden="true" />
-              <div className={styles.screen}>
-                <div className={styles.statusBar} aria-hidden="true">
-                  <span>9:41</span>
-                  <span className={styles.statusPips}>
-                    <i />
-                    <i />
-                    <i />
-                  </span>
-                </div>
-                <div
-                  ref={gridRef}
-                  className={`${styles.grid} ${drag ? styles.gridDragging : ""}`}
-                  style={{ ["--cols" as string]: String(preview.columns), ["--rows" as string]: String(rows) }}
-                >
-                  {preview.widgets.map((widget) => (
-                    <BoardTile
-                      key={widget.id}
-                      widget={widget}
-                      columns={preview.columns}
-                      rows={rows}
-                      rank={ordered.findIndex((item) => item.id === widget.id) + 1}
-                      selected={selected?.id === widget.id}
-                      dragging={drag?.id === widget.id || drag?.fromPalette === widget.type}
-                      swapTarget={swapTarget?.id === widget.id}
-                      onSelect={() => setSelectedId(widget.id)}
-                      onPointerDown={(event) => {
-                        const source = layout.widgets.find((item) => item.id === widget.id);
-                        if (source) startTileDrag(event, source);
-                      }}
-                      onResize={(w, h) => commit(resizeWidget(layout, widget.id, w, h))}
-                    />
-                  ))}
-                </div>
-                <span className={styles.homeBar} aria-hidden="true" />
+            <div className={styles.canvas} data-device={device}>
+              <div
+                ref={gridRef}
+                className={`${styles.grid} ${drag ? styles.gridDragging : ""}`}
+                style={{ ["--cols" as string]: String(preview.columns), ["--rows" as string]: String(rows) }}
+              >
+                {preview.widgets.map((widget) => (
+                  <BoardTile
+                    key={widget.id}
+                    widget={widget}
+                    columns={preview.columns}
+                    rows={rows}
+                    selected={selected?.id === widget.id}
+                    dragging={drag?.id === widget.id || drag?.fromPalette === widget.type}
+                    swapTarget={swapTarget?.id === widget.id}
+                    onSelect={() => setSelectedId(widget.id)}
+                    onPointerDown={(event) => {
+                      const source = layout.widgets.find((item) => item.id === widget.id);
+                      if (source) startTileDrag(event, source);
+                    }}
+                    onResize={(w, h) => commit(resizeWidget(layout, widget.id, w, h))}
+                  />
+                ))}
               </div>
             </div>
           </div>
@@ -462,7 +449,6 @@ function BoardTile({
   widget,
   columns,
   rows,
-  rank,
   selected,
   dragging,
   swapTarget,
@@ -473,7 +459,6 @@ function BoardTile({
   widget: IosWidget;
   columns: number;
   rows: number;
-  rank: number;
   selected: boolean;
   dragging: boolean;
   swapTarget: boolean;
@@ -483,6 +468,7 @@ function BoardTile({
 }) {
   const item = catalogItem(widget.type);
   const title = widgetTitle(widget.type, widget.title);
+  const tone = widgetTone(widget.type);
 
   const style = useMemo(
     () =>
@@ -491,11 +477,10 @@ function BoardTile({
         top: `${(widget.y / rows) * 100}%`,
         width: `${(widget.w / columns) * 100}%`,
         height: `${(widget.h / rows) * 100}%`,
-        ["--accent" as string]: item?.accent ?? "#7a9c9c",
-        opacity: widget.visible ? 1 : 0.45,
+        opacity: widget.visible ? 1 : 0.55,
         zIndex: dragging ? 1 : swapTarget ? 4 : selected ? 3 : 2,
       }) as React.CSSProperties,
-    [columns, dragging, item?.accent, rows, selected, swapTarget, widget]
+    [columns, dragging, rows, selected, swapTarget, widget]
   );
 
   const className = [
@@ -508,11 +493,8 @@ function BoardTile({
 
   return (
     <article className={className} style={style} onPointerDown={onPointerDown} onClick={onSelect}>
-      <div className={styles.face}>
-        <span className={styles.rankBadge}>{rank}</span>
-        <span className={styles.glyph} aria-hidden="true" />
-        <p className={styles.tileKicker}>{item?.blurb}</p>
-        <h3>{title}</h3>
+      <div className={`${styles.face} ${styles[tone]}`}>
+        <WidgetPreview type={widget.type} title={title} />
         {!widget.visible ? <p className={styles.hiddenTag}>Cachée sur le téléphone</p> : null}
       </div>
       <button
@@ -530,6 +512,154 @@ function BoardTile({
         onPointerDown={(event) => beginResize(event, "h", widget, onResize)}
       />
     </article>
+  );
+}
+
+function widgetTone(type: IosWidgetType): "faceLight" | "faceDark" | "faceGold" {
+  if (type === "timeClock" || type === "complianceScore") return "faceDark";
+  if (type === "inventoryAlerts" || type === "procedurePerformance") return "faceGold";
+  return "faceLight";
+}
+
+function WidgetPreview({ type, title }: { type: IosWidgetType; title: string }) {
+  return (
+    <>
+      <header className={styles.cardHead}>
+        <h3>{title}</h3>
+        <span className={styles.more} aria-hidden="true">
+          ···
+        </span>
+      </header>
+      {type === "greeting" ? (
+        <div className={styles.previewBody}>
+          <p className={styles.heroMetric}>Bonjour</p>
+          <p className={styles.mutedLine}>Vendredi 11 septembre</p>
+        </div>
+      ) : null}
+      {type === "metrics" ? (
+        <div className={styles.statRow}>
+          <div>
+            <strong>12</strong>
+            <span>Relevés</span>
+          </div>
+          <div>
+            <strong>4</strong>
+            <span>Tâches</span>
+          </div>
+          <div>
+            <strong>98%</strong>
+            <span>OK</span>
+          </div>
+        </div>
+      ) : null}
+      {type === "timeClock" ? (
+        <div className={styles.ringWrap}>
+          <div className={styles.ring} />
+          <div className={styles.ringLabel}>
+            <strong>08:12</strong>
+            <span>En service</span>
+          </div>
+        </div>
+      ) : null}
+      {type === "equipment" ? (
+        <ul className={styles.miniList}>
+          <li>
+            <span>Chambre froide</span>
+            <em className={styles.pillOk}>OK</em>
+          </li>
+          <li>
+            <span>Four 1</span>
+            <em className={styles.pillWarn}>Surveiller</em>
+          </li>
+        </ul>
+      ) : null}
+      {type === "procedures" ? (
+        <div className={styles.previewBody}>
+          <div className={styles.taskCard}>
+            <p>Ouverture cuisine</p>
+            <div className={styles.bar}>
+              <i style={{ width: "70%" }} />
+            </div>
+            <span>7 / 10</span>
+          </div>
+        </div>
+      ) : null}
+      {type === "notes" ? (
+        <ul className={styles.miniList}>
+          <li>
+            <span>Livraison poisson</span>
+            <em className={styles.pillMuted}>10:20</em>
+          </li>
+          <li>
+            <span>Filtre à changer</span>
+            <em className={styles.pillMuted}>Hier</em>
+          </li>
+        </ul>
+      ) : null}
+      {type === "temperatureOverview" ? (
+        <div className={styles.previewBody}>
+          <p className={styles.heroMetric}>
+            3° <span>hors plage</span>
+          </p>
+          <div className={styles.bar}>
+            <i className={styles.barWarn} style={{ width: "22%" }} />
+          </div>
+        </div>
+      ) : null}
+      {type === "procedureStatus" ? (
+        <ul className={styles.miniList}>
+          <li>
+            <span>Terminées</span>
+            <em className={styles.pillOk}>8</em>
+          </li>
+          <li>
+            <span>En cours</span>
+            <em className={styles.pillWarn}>2</em>
+          </li>
+        </ul>
+      ) : null}
+      {type === "inventoryAlerts" ? (
+        <div className={styles.statRow}>
+          <div>
+            <strong>2</strong>
+            <span>Expirés</span>
+          </div>
+          <div>
+            <strong>5</strong>
+            <span>Bientôt</span>
+          </div>
+        </div>
+      ) : null}
+      {type === "complianceScore" ? (
+        <div className={styles.ringWrap}>
+          <div className={`${styles.ring} ${styles.ringOk}`} />
+          <div className={styles.ringLabel}>
+            <strong>96%</strong>
+            <span>Score HACCP</span>
+          </div>
+        </div>
+      ) : null}
+      {type === "temperatureTrends" ? (
+        <div className={styles.bars}>
+          <i style={{ height: "42%" }} />
+          <i style={{ height: "70%" }} />
+          <i style={{ height: "55%" }} />
+          <i style={{ height: "88%" }} />
+        </div>
+      ) : null}
+      {type === "procedurePerformance" ? (
+        <div className={styles.statRow}>
+          <div>
+            <strong>94%</strong>
+            <span>Réussite</span>
+          </div>
+          <div>
+            <strong>18m</strong>
+            <span>Durée</span>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }
 
