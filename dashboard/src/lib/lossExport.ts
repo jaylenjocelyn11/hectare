@@ -152,8 +152,8 @@ function concatBytes(parts: Uint8Array[]): Uint8Array {
 }
 
 function pdfFromJpegs(jpegs: { bytes: Uint8Array; width: number; height: number }[]): Blob {
-  const pageW = 792;
-  const pageH = 612;
+  const pageW = 612;
+  const pageH = 792;
   const encoder = new TextEncoder();
   const objects: Uint8Array[] = [];
 
@@ -215,21 +215,21 @@ function pdfFromJpegs(jpegs: { bytes: Uint8Array; width: number; height: number 
 
 export async function exportLossesPdf(rows: LossExportRow[], organizationLabel: string) {
   const logo = await loadLogo();
-  const width = 1584;
-  const height = 1224;
+  const width = 1224;
+  const height = 1584;
   const margin = 48;
   const rowH = 36;
   const headerH = 140;
   const cols = [
-    { label: "Date", w: 150 },
-    { label: "Article", w: 230 },
-    { label: "Type", w: 150 },
-    { label: "Quantité", w: 100 },
+    { label: "Date", w: 140 },
+    { label: "Article", w: 200 },
+    { label: "Type", w: 110 },
+    { label: "Qté", w: 70 },
     { label: "Unité", w: 70 },
-    { label: "Coût unit.", w: 120 },
-    { label: "Total", w: 120 },
-    { label: "Motif", w: 220 },
-    { label: "Saisi par", w: 140 },
+    { label: "Coût unit.", w: 110 },
+    { label: "Total", w: 110 },
+    { label: "Motif", w: 190 },
+    { label: "Saisi par", w: 128 },
   ];
   const tableTop = headerH + 24;
   const usable = height - tableTop - 70;
@@ -322,9 +322,11 @@ export async function exportLossesPdf(rows: LossExportRow[], organizationLabel: 
     ctx.textAlign = "right";
     ctx.fillText(`Coût total : ${money(total)}`, width - margin, height - 36);
     ctx.textAlign = "left";
+    ctx.textAlign = "center";
     ctx.font = "400 14px Outfit, sans-serif";
     ctx.fillStyle = "#888888";
-    ctx.fillText(`Page ${page + 1} / ${pages}`, width / 2 - 30, height - 36);
+    ctx.fillText(`Page ${page + 1} / ${pages}`, width / 2, height - 36);
+    ctx.textAlign = "left";
 
     jpegs.push({ bytes: jpegFromCanvas(canvas), width, height });
   }

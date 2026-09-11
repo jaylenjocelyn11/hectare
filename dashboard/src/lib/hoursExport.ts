@@ -428,8 +428,8 @@ function concatBytes(parts: Uint8Array[]): Uint8Array {
 }
 
 function pdfFromJpegs(jpegs: { bytes: Uint8Array; width: number; height: number }[]): Blob {
-  const pageW = 792;
-  const pageH = 612;
+  const pageW = 612;
+  const pageH = 792;
   const encoder = new TextEncoder();
   const objects: Uint8Array[] = [];
 
@@ -582,8 +582,8 @@ export async function exportHoursPdf(
 ) {
   const logo = await loadLogo();
   const { details, summaries, totalMinutes } = buildHoursReport(punches, employees, period);
-  const width = 1584;
-  const height = 1224;
+  const width = 1224;
+  const height = 1584;
   const margin = 48;
   const rowH = 34;
   const usable = height - 168 - 70;
@@ -592,25 +592,23 @@ export async function exportHoursPdf(
   const periodLabel = hoursPeriodLabel(period);
 
   const summaryCols = [
-    { label: "Employé", w: 280 },
-    { label: "Rôle", w: 140 },
-    { label: "Statut", w: 120 },
-    { label: "Pointages", w: 120 },
-    { label: "En poste", w: 110 },
-    { label: "Heures", w: 160 },
-    { label: "Décimal", w: 120 },
-    { label: "Moyenne", w: 160 },
-    { label: "Dernier pointage", w: 274 },
+    { label: "Employé", w: 250 },
+    { label: "Rôle", w: 120 },
+    { label: "Pointages", w: 100 },
+    { label: "Heures", w: 140 },
+    { label: "Décimal", w: 100 },
+    { label: "Moyenne", w: 140 },
+    { label: "Dernier pointage", w: 278 },
   ];
   const detailCols = [
-    { label: "Date", w: 150 },
-    { label: "Employé", w: 240 },
-    { label: "Arrivée", w: 210 },
-    { label: "Départ", w: 210 },
-    { label: "Durée", w: 130 },
-    { label: "Statut", w: 130 },
-    { label: "Source", w: 180 },
-    { label: "Note", w: 238 },
+    { label: "Date", w: 120 },
+    { label: "Employé", w: 190 },
+    { label: "Arrivée", w: 170 },
+    { label: "Départ", w: 170 },
+    { label: "Durée", w: 100 },
+    { label: "Statut", w: 100 },
+    { label: "Source", w: 130 },
+    { label: "Note", w: 148 },
   ];
 
   const summaryPages = Math.max(1, Math.ceil(summaries.length / rowsPerPage));
@@ -636,9 +634,7 @@ export async function exportHoursPdf(
       slice.map((row) => [
         row.employee,
         row.role,
-        row.active,
         String(row.punches),
-        String(row.open),
         row.durationLabel,
         String(row.hours),
         row.averageLabel,
