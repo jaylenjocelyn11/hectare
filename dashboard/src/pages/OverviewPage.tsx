@@ -1,7 +1,9 @@
 import { useOutletContext } from "react-router-dom";
+import { IosDashboardStudio } from "../components/IosDashboardStudio";
 import { LocationCategoriesSection } from "../components/LocationCategoriesSection";
 import { ManageNotice, useManageState } from "../components/ManageControls";
 import { useEquipment } from "../hooks/useEquipment";
+import { useIosDashboardLayout } from "../hooks/useIosDashboardLayout";
 import { useOrgCollection } from "../hooks/useOrgCollection";
 import { asDate, formatDateTime, isSameLocalDay } from "../lib/dates";
 import { asText, namedFromDocs } from "../lib/text";
@@ -32,6 +34,7 @@ type ProcedureTemplate = {
 
 export function OverviewPage() {
   const { organizationId, resolving, error: orgError } = useOutletContext<OrgContext>();
+  const iosLayout = useIosDashboardLayout(organizationId);
   const equipment = useEquipment(organizationId);
   const readings = useOrgCollection<TempReading>(organizationId, "tempReadings");
   const runs = useOrgCollection<ProcedureRun>(organizationId, "procedureRuns");
@@ -133,6 +136,14 @@ export function OverviewPage() {
           </div>
 
           <ManageNotice error={manage.error} ok={manage.ok} />
+          {organizationId ? (
+            <IosDashboardStudio
+              layouts={iosLayout.layouts}
+              saveState={iosLayout.saveState}
+              error={iosLayout.error}
+              setLayout={iosLayout.setLayout}
+            />
+          ) : null}
           <LocationCategoriesSection organizationId={organizationId} manage={manage} />
 
           <h2 className={styles.h2}>Derniers relevés</h2>
