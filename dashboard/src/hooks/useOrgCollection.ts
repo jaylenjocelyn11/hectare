@@ -81,7 +81,7 @@ export function useOrgCollection<T extends DocumentData>(
     let unsub = () => {};
     try {
       const db = getFirebaseFirestore();
-      const cap = SMALL_COLLECTIONS.has(collectionName) ? 500 : 80;
+      const cap = collectionName === "timePunches" ? 2000 : SMALL_COLLECTIONS.has(collectionName) ? 500 : 80;
       const ref = query(
         collection(db, "organizations", organizationId, collectionName),
         limit(cap)

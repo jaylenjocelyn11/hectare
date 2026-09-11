@@ -10,6 +10,13 @@ import {
 import { useEquipment } from "../hooks/useEquipment";
 import { useOrgCollection } from "../hooks/useOrgCollection";
 import { asDate, formatDateTime } from "../lib/dates";
+import {
+  buildHoursReport,
+  exportHoursExcel,
+  exportHoursPdf,
+  hoursPeriodLabel,
+  type HoursPeriod,
+} from "../lib/hoursExport";
 import { noteCategoryLabel } from "../lib/labels";
 import { createOrgDoc, patchOrgDoc, writeMessage } from "../lib/orgWrite";
 import { asNumber, asText, namedFromDocs } from "../lib/text";
@@ -51,6 +58,16 @@ type Note = {
 
 type ProcedureTemplate = { name?: string };
 
+type AppUser = { name?: string; role?: string; isActive?: boolean };
+type TimePunch = {
+  userId?: string;
+  userName?: string;
+  clockInAt?: unknown;
+  clockOutAt?: unknown;
+  note?: string;
+  source?: string;
+};
+
 type Period = "today" | "week" | "month";
 
 function startOfPeriod(period: Period): Date {
@@ -68,9 +85,11 @@ function inPeriod(value: unknown, period: Period): boolean {
 }
 
 export function ReportsPage() {
-  const { organizationId } = useOutletContext<OrgContext>();
+  const { organizationId, dashboard, slug } = useOutletContext<OrgContext>();
   const [period, setPeriod] = useState<Period>("week");
+  const [hoursPeriod, setHoursPeriod] = useState<HoursPeriod>("week");
   const manage = useManageState();
+  const orgLabel = dashboard?.name || slug || "Organisation";
   const [noteTitle, setNoteTitle] = useState("");
   const [noteContent, setNoteContent] = useState("");
   const [noteCategory, setNoteCategory] = useState("general");
@@ -83,6 +102,8 @@ export function ReportsPage() {
   const runs = useOrgCollection<ProcedureRun>(organizationId, "procedureRuns");
   const inventory = useOrgCollection<InventoryItem>(organizationId, "inventory");
   const notes = useOrgCollection<Note>(organizationId, "notes");
+  const users = useOrgCollection<AppUser>(organizationId, "users");
+  const punches = useOrgCollection<TimePunch>(organizationId, "timePunches");
 
   const periodReadings = useMemo(
     () => readings.docs.filter((r) => inPeriod(r.timestamp ?? r.date, period)),
@@ -111,6 +132,33 @@ export function ReportsPage() {
 
   const equipmentName = (id?: unknown) => namedFromDocs(equipment.lookup, id, "—");
   const templateName = (id?: unknown) => namedFromDocs(templates.docs, id, "Procédure");
+
+  const hoursReport = useMemo(
+    () => buildHoursReport(punches.docs, users.docs, hoursPeriod),
+    [punches.docs, users.docs, hoursPeriod]
+  );
+
+  async function handleHoursPdf() {
+    manage.setBusyId("hours-pdf");
+    manage.setError(null);
+    try {
+      await exportHoursPdf(punches.docs, users.docs, orgLabel, hoursPeriod);
+      manage.setOk("PDF des heures téléchargé.");
+    } catch (err) {
+      manage.setError(writeMessage(err));
+    } finally {
+      manage.setBusyId(null);
+    }
+  }
+
+  function handleHoursExcel() {
+    try {
+      exportHoursExcel(punches.docs, users.docs, orgLabel, hoursPeriod);
+      manage.setOk("Excel des heures téléchargé.");
+    } catch (err) {
+      manage.setError(writeMessage(err));
+    }
+  }
 
   async function addNote(e: FormEvent) {
     e.preventDefault();
@@ -163,6 +211,8 @@ export function ReportsPage() {
         runs.error,
         inventory.error,
         notes.error,
+        users.error,
+        punches.error,
       ]}
     >
       <h1 className={styles.h1}>Rapports</h1>
@@ -199,6 +249,78 @@ export function ReportsPage() {
           </strong>
         </article>
       </div>
+
+      <h2 className={styles.h2}>Heures des employés</h2>
+      <p className={styles.meta}>
+        Export PDF ou Excel de tous les employés : synthèse, détail des pointages, totaux par jour et par
+        semaine, avec le logo Rustiq.
+      </p>
+      <label className={styles.filter}>
+        Période des heures
+        <select value={hoursPeriod} onChange={(e) => setHoursPeriod(e.target.value as HoursPeriod)}>
+          <option value="today">Aujourd’hui</option>
+          <option value="week">7 derniers jours</option>
+          <option value="month">30 derniers jours</option>
+          <option value="all">Tout l’historique chargé</option>
+        </select>
+      </label>
+      <div className={styles.kpis}>
+        <article className={styles.kpi}>
+          <span className={styles.kpiLabel}>Employés</span>
+          <strong className={styles.kpiValue}>{hoursReport.summaries.length}</strong>
+        </article>
+        <article className={styles.kpi}>
+          <span className={styles.kpiLabel}>Pointages ({hoursPeriodLabel(hoursPeriod)})</span>
+          <strong className={styles.kpiValue}>{hoursReport.details.length}</strong>
+        </article>
+        <article className={styles.kpi}>
+          <span className={styles.kpiLabel}>Heures équipe</span>
+          <strong className={styles.kpiValue}>
+            {Math.floor(hoursReport.totalMinutes / 60)} h {hoursReport.totalMinutes % 60} min
+          </strong>
+        </article>
+      </div>
+      <div className={styles.manageActions}>
+        <GhostButton onClick={handleHoursExcel} disabled={users.loading || punches.loading}>
+          Exporter Excel
+        </GhostButton>
+        <GhostButton
+          onClick={() => void handleHoursPdf()}
+          disabled={users.loading || punches.loading || manage.busyId === "hours-pdf"}
+        >
+          {manage.busyId === "hours-pdf" ? "PDF…" : "Exporter PDF"}
+        </GhostButton>
+      </div>
+      <ManageNotice error={manage.error} ok={manage.ok} />
+      {users.loading || punches.loading ? <p className="muted">Chargement des heures…</p> : null}
+      {hoursReport.summaries.length === 0 ? (
+        <p className="muted">Aucun employé à exporter. Ajoute-les dans Paramètres.</p>
+      ) : (
+        <div className={styles.tableWrap}>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th>Employé</th>
+                <th>Rôle</th>
+                <th>Pointages</th>
+                <th>Heures</th>
+                <th>En poste</th>
+              </tr>
+            </thead>
+            <tbody>
+              {hoursReport.summaries.map((row) => (
+                <tr key={row.userId}>
+                  <td>{row.employee}</td>
+                  <td>{row.role}</td>
+                  <td>{row.punches}</td>
+                  <td>{row.durationLabel}</td>
+                  <td>{row.open ? <span className={styles.tagWarn}>{row.open}</span> : "0"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <h2 className={styles.h2}>Notes</h2>
       {organizationId ? (
