@@ -44,7 +44,9 @@ export function IosDashboardStudio({ layouts, saveState, error, setLayout }: Stu
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drag, setDrag] = useState<DragSession | null>(null);
   const [dropCell, setDropCell] = useState<{ x: number; y: number } | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   const gridRef = useRef<HTMLDivElement | null>(null);
+  const rafRef = useRef(0);
 
   const layout = layouts[device];
   const layoutRef = useRef(layout);
@@ -56,11 +58,29 @@ export function IosDashboardStudio({ layouts, saveState, error, setLayout }: Stu
   rowsRef.current = rows;
   const usedTypes = new Set(layout.widgets.map((widget) => widget.type));
   const palette = WIDGET_CATALOG.filter((item) => !usedTypes.has(item.type));
+
+  const preview = useMemo(() => {
+    if (!drag || !dropCell) return layout;
+    if (drag.fromPalette) {
+      const withWidget = addWidget(layout, drag.fromPalette);
+      const added = withWidget.widgets.find((widget) => widget.type === drag.fromPalette);
+      return added ? relocateWidget(withWidget, added.id, dropCell.x, dropCell.y) : withWidget;
+    }
+    return relocateWidget(layout, drag.id, dropCell.x, dropCell.y);
+  }, [drag, dropCell, layout]);
+
   const swapTarget = dropCell
     ? layout.widgets.find(
         (widget) => widget.id !== drag?.id && occupies(widget, dropCell.x, dropCell.y)
       )
     : undefined;
+
+  const heldName = drag
+    ? widgetTitle(
+        (drag.fromPalette ?? layout.widgets.find((widget) => widget.id === drag.id)?.type) || "notes",
+        layout.widgets.find((widget) => widget.id === drag.id)?.title
+      )
+    : "";
 
   useEffect(() => {
     if (selected && !layout.widgets.some((widget) => widget.id === selected.id)) {
@@ -69,24 +89,36 @@ export function IosDashboardStudio({ layouts, saveState, error, setLayout }: Stu
   }, [layout.widgets, selected]);
 
   useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(null), 2600);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+
+  useEffect(() => {
     const onMove = (event: PointerEvent) => {
       const session = dragRef.current;
       if (!session) return;
-      const next = { ...session, pointerX: event.clientX, pointerY: event.clientY };
-      dragRef.current = next;
-      setDrag(next);
-      const currentLayout = layoutRef.current;
-      const cell = cellFromPoint(
-        gridRef.current,
-        event.clientX,
-        event.clientY,
-        currentLayout.columns,
-        rowsRef.current
-      );
-      if (!cell) return;
-      setDropCell({
-        x: Math.max(0, cell.x - session.grabCol),
-        y: Math.max(0, cell.y - session.grabRow),
+      session.pointerX = event.clientX;
+      session.pointerY = event.clientY;
+      if (rafRef.current) return;
+      rafRef.current = window.requestAnimationFrame(() => {
+        rafRef.current = 0;
+        const live = dragRef.current;
+        if (!live) return;
+        setDrag({ ...live });
+        const currentLayout = layoutRef.current;
+        const cell = cellFromPoint(
+          gridRef.current,
+          live.pointerX,
+          live.pointerY,
+          currentLayout.columns,
+          rowsRef.current
+        );
+        if (!cell) return;
+        setDropCell({
+          x: Math.max(0, cell.x - live.grabCol),
+          y: Math.max(0, cell.y - live.grabRow),
+        });
       });
     };
     const onUp = (event: PointerEvent) => {
@@ -110,14 +142,26 @@ export function IosDashboardStudio({ layouts, saveState, error, setLayout }: Stu
       if (session.fromPalette) {
         const withWidget = addWidget(currentLayout, session.fromPalette);
         const added = withWidget.widgets.find((widget) => widget.type === session.fromPalette);
-        setLayout(device, added ? relocateWidget(withWidget, added.id, x, y) : withWidget);
+        const next = added ? relocateWidget(withWidget, added.id, x, y) : withWidget;
+        setLayout(device, next);
         setSelectedId(session.fromPalette);
+        setToast("La nouvelle carte est sur l’écran.");
         return;
       }
       const current = currentLayout.widgets.find((widget) => widget.id === session.id);
       if (current && current.x === x && current.y === y) return;
+      const hit = currentLayout.widgets.find(
+        (widget) => widget.id !== session.id && occupies(widget, x, y)
+      );
       setLayout(device, relocateWidget(currentLayout, session.id, x, y));
       setSelectedId(session.id);
+      if (hit && current) {
+        setToast(
+          `${widgetTitle(current.type, current.title)} et ${widgetTitle(hit.type, hit.title)} ont échangé leur place.`
+        );
+      } else {
+        setToast("La carte a changé de place.");
+      }
     };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
@@ -126,17 +170,18 @@ export function IosDashboardStudio({ layouts, saveState, error, setLayout }: Stu
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
+      if (rafRef.current) window.cancelAnimationFrame(rafRef.current);
     };
   }, [device, setLayout]);
 
   const saveLabel =
     saveState === "saving"
-      ? "Envoi vers l’iPhone et l’iPad…"
+      ? "On enregistre…"
       : saveState === "saved"
-        ? "Synchronisé avec l’app"
+        ? "C’est enregistré. Les tablettes vont suivre."
         : saveState === "error"
-          ? "Enregistrement impossible"
-          : "Les changements partent tout seuls";
+          ? "L’enregistrement n’a pas marché. Réessayez."
+          : "Rien à faire : ça s’enregistre tout seul.";
 
   function commit(next: IosDashboardLayout) {
     setLayout(device, next);
@@ -180,21 +225,30 @@ export function IosDashboardStudio({ layouts, saveState, error, setLayout }: Stu
   const ghostItem = drag
     ? catalogItem(drag.fromPalette ?? layout.widgets.find((widget) => widget.id === drag.id)?.type ?? "metrics")
     : null;
+  const ordered = preview.widgets.slice().sort((a, b) => a.y - b.y || a.x - b.x);
+  const coach = drag
+    ? swapTarget
+      ? `Relâchez : « ${heldName} » prendra la place de « ${widgetTitle(swapTarget.type, swapTarget.title)} ».`
+      : `Glissez encore, puis relâchez pour poser « ${heldName} ».`
+    : selected
+      ? `Carte choisie : ${widgetTitle(selected.type, selected.title)}. Montez-la, descendez-la, ou glissez-la.`
+      : "Posez le doigt sur une carte, gardez-le appuyé, puis glissez-la sur une autre.";
 
   return (
     <section className={styles.studio} aria-labelledby="ios-studio-title">
       <header className={styles.hero}>
         <div>
-          <p className={styles.kicker}>Atelier iOS</p>
+          <p className={styles.kicker}>Écran d’accueil</p>
           <h2 id="ios-studio-title" className={styles.title}>
-            Composer l’écran d’accueil
+            Ranger les cartes du téléphone
           </h2>
           <p className={styles.lead}>
-            Attrapez un module et déposez-le sur un autre pour échanger leur rang, ou sur une case
-            libre pour le déplacer. L’app iPhone et iPad suit en direct.
+            Comme des photos sur une table : on en prend une, on la pose ailleurs. L’iPad et
+            l’iPhone montrent ensuite le même ordre.
           </p>
         </div>
         <div className={styles.heroMeta}>
+          <p className={styles.deviceLabel}>Quel appareil voulez-vous ranger ?</p>
           <div className={styles.deviceSwitch} role="tablist" aria-label="Appareil">
             <button
               type="button"
@@ -203,7 +257,7 @@ export function IosDashboardStudio({ layouts, saveState, error, setLayout }: Stu
               className={device === "iphone" ? styles.deviceOn : styles.deviceOff}
               onClick={() => setDevice("iphone")}
             >
-              iPhone
+              Le téléphone
             </button>
             <button
               type="button"
@@ -212,22 +266,37 @@ export function IosDashboardStudio({ layouts, saveState, error, setLayout }: Stu
               className={device === "ipad" ? styles.deviceOn : styles.deviceOff}
               onClick={() => setDevice("ipad")}
             >
-              iPad
+              La tablette
             </button>
           </div>
           <p className={saveState === "error" ? styles.saveBad : styles.saveOk}>{saveLabel}</p>
         </div>
       </header>
 
+      <ol className={styles.steps}>
+        <li>
+          <strong>1</strong>
+          Choisissez téléphone ou tablette
+        </li>
+        <li>
+          <strong>2</strong>
+          Posez le doigt sur une carte
+        </li>
+        <li>
+          <strong>3</strong>
+          Glissez-la, puis relâchez
+        </li>
+      </ol>
+
       {error ? <p className={styles.warn}>{error}</p> : null}
 
       <div className={styles.workspace}>
         <aside className={styles.palette}>
-          <p className={styles.asideLabel}>Modules</p>
-          <p className={styles.asideHint}>Glissez un module sur l’écran, ou cliquez pour l’ajouter.</p>
+          <p className={styles.asideLabel}>Cartes à ajouter</p>
+          <p className={styles.asideHint}>Appuyez sur une carte pour la faire apparaître à l’écran.</p>
           <ul className={styles.paletteList}>
             {palette.length === 0 ? (
-              <li className={styles.emptyPalette}>Tous les modules sont déjà sur l’écran.</li>
+              <li className={styles.emptyPalette}>Toutes les cartes sont déjà sur l’écran.</li>
             ) : (
               palette.map((item) => (
                 <li key={item.type}>
@@ -238,9 +307,9 @@ export function IosDashboardStudio({ layouts, saveState, error, setLayout }: Stu
                     onPointerDown={(event) => startPaletteDrag(event, item.type)}
                     onClick={() => {
                       if (dragRef.current) return;
-                      const next = addWidget(layout, item.type);
-                      commit(next);
+                      commit(addWidget(layout, item.type));
                       setSelectedId(item.type);
+                      setToast(`${item.title} a été ajoutée.`);
                     }}
                   >
                     <span className={styles.swatch} />
@@ -258,12 +327,13 @@ export function IosDashboardStudio({ layouts, saveState, error, setLayout }: Stu
               type="button"
               className={styles.ghost}
               onClick={() => {
-                if (!window.confirm("Revenir à la composition d’origine pour cet appareil ?")) return;
+                if (!window.confirm("Remettre l’écran comme au début, pour cet appareil ?")) return;
                 commit(defaultLayout(device));
                 setSelectedId(null);
+                setToast("L’écran est revenu comme au début.");
               }}
             >
-              Réinitialiser {device === "iphone" ? "l’iPhone" : "l’iPad"}
+              Recommencer
             </button>
             <button
               type="button"
@@ -271,9 +341,14 @@ export function IosDashboardStudio({ layouts, saveState, error, setLayout }: Stu
               onClick={() => {
                 const other: IosDeviceKind = device === "iphone" ? "ipad" : "iphone";
                 setLayout(device, remapLayout(layouts[other], device));
+                setToast(
+                  device === "iphone"
+                    ? "Le téléphone a maintenant le même rangement que la tablette."
+                    : "La tablette a maintenant le même rangement que le téléphone."
+                );
               }}
             >
-              Copier depuis {device === "iphone" ? "l’iPad" : "l’iPhone"}
+              Copier l’autre écran
             </button>
           </div>
         </aside>
@@ -281,29 +356,27 @@ export function IosDashboardStudio({ layouts, saveState, error, setLayout }: Stu
         <div className={`${styles.stage} ${device === "iphone" ? styles.stagePhone : styles.stagePad}`}>
           <div className={styles.bezel} data-device={device}>
             <div className={styles.notch} aria-hidden="true" />
+            <p className={drag ? styles.coachLive : styles.coach}>{coach}</p>
             <div
               ref={gridRef}
               className={`${styles.grid} ${drag ? styles.gridDragging : ""}`}
-              style={{
-                gridTemplateColumns: `repeat(${layout.columns}, 1fr)`,
-                gridTemplateRows: `repeat(${rows}, minmax(52px, 1fr))`,
-              }}
+              style={{ ["--cols" as string]: String(preview.columns), ["--rows" as string]: String(rows) }}
             >
-              {Array.from({ length: layout.columns * rows }, (_, index) => {
-                const x = index % layout.columns;
-                const y = Math.floor(index / layout.columns);
-                const hot = dropCell?.x === x && dropCell?.y === y && !swapTarget;
-                return <span key={`${x}-${y}`} className={hot ? styles.cellHot : styles.cell} />;
-              })}
-              {layout.widgets.map((widget) => (
+              {preview.widgets.map((widget) => (
                 <BoardTile
                   key={widget.id}
                   widget={widget}
+                  columns={preview.columns}
+                  rows={rows}
+                  rank={ordered.findIndex((item) => item.id === widget.id) + 1}
                   selected={selected?.id === widget.id}
-                  dragging={drag?.id === widget.id}
+                  dragging={drag?.id === widget.id || drag?.fromPalette === widget.type}
                   swapTarget={swapTarget?.id === widget.id}
                   onSelect={() => setSelectedId(widget.id)}
-                  onPointerDown={(event) => startTileDrag(event, widget)}
+                  onPointerDown={(event) => {
+                    const source = layout.widgets.find((item) => item.id === widget.id);
+                    if (source) startTileDrag(event, source);
+                  }}
                   onResize={(w, h) => commit(resizeWidget(layout, widget.id, w, h))}
                 />
               ))}
@@ -312,42 +385,43 @@ export function IosDashboardStudio({ layouts, saveState, error, setLayout }: Stu
         </div>
 
         <aside className={styles.inspector}>
-          <p className={styles.asideLabel}>Module choisi</p>
+          <p className={styles.asideLabel}>La carte choisie</p>
           {selected ? (
             <Inspector
               widget={selected}
               columns={layout.columns}
               onChange={(patch) => commit(updateWidget(layout, selected.id, patch))}
-              onNudge={(dir) => commit(nudgeRank(layout, selected.id, dir))}
+              onNudge={(dir) => {
+                commit(nudgeRank(layout, selected.id, dir));
+                setToast(dir < 0 ? "La carte est montée." : "La carte est descendue.");
+              }}
               onRemove={() => {
+                if (!window.confirm("Enlever cette carte de l’écran ?")) return;
                 commit(removeWidget(layout, selected.id));
                 setSelectedId(null);
+                setToast("La carte a été enlevée.");
               }}
             />
           ) : (
             <p className={styles.asideHint}>
-              Glissez un module sur un autre pour inverser leur place. Cliquez-en un pour le
-              renommer, le redimensionner ou le retirer.
+              Appuyez sur une carte à l’écran. Ensuite vous pourrez la monter, la descendre, ou
+              changer son nom.
             </p>
           )}
+          <p className={styles.orderTitle}>Ordre sur l’écran</p>
           <ol className={styles.legend}>
-            {layout.widgets
-              .slice()
-              .sort((a, b) => a.y - b.y || a.x - b.x)
-              .map((widget) => (
-                <li key={widget.id}>
-                  <button
-                    type="button"
-                    className={selected?.id === widget.id ? styles.legendOn : styles.legendOff}
-                    onClick={() => setSelectedId(widget.id)}
-                  >
-                    <span>{widgetTitle(widget.type, widget.title)}</span>
-                    <span>
-                      col {widget.x + 1} · rang {widget.y + 1}
-                    </span>
-                  </button>
-                </li>
-              ))}
+            {ordered.map((widget, index) => (
+              <li key={widget.id}>
+                <button
+                  type="button"
+                  className={selected?.id === widget.id ? styles.legendOn : styles.legendOff}
+                  onClick={() => setSelectedId(widget.id)}
+                >
+                  <span className={styles.orderNum}>{index + 1}</span>
+                  <span>{widgetTitle(widget.type, widget.title)}</span>
+                </button>
+              </li>
+            ))}
           </ol>
         </aside>
       </div>
@@ -356,21 +430,26 @@ export function IosDashboardStudio({ layouts, saveState, error, setLayout }: Stu
         <div
           className={styles.dragGhost}
           style={{
-            left: drag.pointerX + 12,
-            top: drag.pointerY + 12,
+            left: drag.pointerX,
+            top: drag.pointerY,
             ["--accent" as string]: ghostItem.accent,
           }}
         >
           <strong>{ghostItem.title}</strong>
-          <span>{swapTarget ? "Relâcher pour échanger" : "Relâcher pour placer"}</span>
+          <span>{swapTarget ? "Relâchez pour échanger" : "Relâchez pour poser ici"}</span>
         </div>
       ) : null}
+
+      {toast ? <p className={styles.toast}>{toast}</p> : null}
     </section>
   );
 }
 
 function BoardTile({
   widget,
+  columns,
+  rows,
+  rank,
   selected,
   dragging,
   swapTarget,
@@ -379,6 +458,9 @@ function BoardTile({
   onResize,
 }: {
   widget: IosWidget;
+  columns: number;
+  rows: number;
+  rank: number;
   selected: boolean;
   dragging: boolean;
   swapTarget: boolean;
@@ -388,17 +470,19 @@ function BoardTile({
 }) {
   const item = catalogItem(widget.type);
   const title = widgetTitle(widget.type, widget.title);
-  const [resizing, setResizing] = useState<"w" | "h" | null>(null);
 
   const style = useMemo(
     () =>
       ({
-        gridColumn: `${widget.x + 1} / span ${widget.w}`,
-        gridRow: `${widget.y + 1} / span ${widget.h}`,
+        left: `${(widget.x / columns) * 100}%`,
+        top: `${(widget.y / rows) * 100}%`,
+        width: `${(widget.w / columns) * 100}%`,
+        height: `${(widget.h / rows) * 100}%`,
         ["--accent" as string]: item?.accent ?? "#7a9c9c",
-        opacity: widget.visible ? 1 : 0.42,
+        opacity: widget.visible ? 1 : 0.45,
+        zIndex: dragging ? 1 : swapTarget ? 4 : selected ? 3 : 2,
       }) as React.CSSProperties,
-    [item?.accent, widget]
+    [columns, dragging, item?.accent, rows, selected, swapTarget, widget]
   );
 
   const className = [
@@ -411,62 +495,53 @@ function BoardTile({
 
   return (
     <article className={className} style={style} onPointerDown={onPointerDown} onClick={onSelect}>
+      <span className={styles.rankBadge}>{rank}</span>
       <p className={styles.tileKicker}>{item?.blurb}</p>
       <h3>{title}</h3>
-      {!widget.visible ? <p className={styles.hiddenTag}>Masqué dans l’app</p> : null}
+      {!widget.visible ? <p className={styles.hiddenTag}>Cachée sur le téléphone</p> : null}
       <button
         type="button"
         className={styles.handleE}
         data-handle="w"
-        aria-label="Étirer en largeur"
-        onPointerDown={(event) => {
-          event.stopPropagation();
-          setResizing("w");
-          const grid = event.currentTarget.closest(`.${styles.grid}`);
-          if (!grid) return;
-          const onMovePtr = (ev: PointerEvent) => {
-            const rect = grid.getBoundingClientRect();
-            const colW = rect.width / columnCount(grid);
-            const nextW = Math.max(1, Math.round((ev.clientX - rect.left) / colW) - widget.x);
-            onResize(nextW, widget.h);
-          };
-          const onUp = () => {
-            window.removeEventListener("pointermove", onMovePtr);
-            window.removeEventListener("pointerup", onUp);
-            setResizing(null);
-          };
-          window.addEventListener("pointermove", onMovePtr);
-          window.addEventListener("pointerup", onUp);
-        }}
+        aria-label="Rendre plus large"
+        onPointerDown={(event) => beginResize(event, "w", widget, onResize)}
       />
       <button
         type="button"
         className={styles.handleS}
         data-handle="h"
-        aria-label="Étirer en hauteur"
-        onPointerDown={(event) => {
-          event.stopPropagation();
-          setResizing("h");
-          const grid = event.currentTarget.closest(`.${styles.grid}`);
-          if (!grid) return;
-          const onMovePtr = (ev: PointerEvent) => {
-            const rect = grid.getBoundingClientRect();
-            const rowH = rect.height / rowsFrom(grid);
-            const nextH = Math.max(1, Math.round((ev.clientY - rect.top) / rowH) - widget.y);
-            onResize(widget.w, nextH);
-          };
-          const onUp = () => {
-            window.removeEventListener("pointermove", onMovePtr);
-            window.removeEventListener("pointerup", onUp);
-            setResizing(null);
-          };
-          window.addEventListener("pointermove", onMovePtr);
-          window.addEventListener("pointerup", onUp);
-        }}
+        aria-label="Rendre plus haute"
+        onPointerDown={(event) => beginResize(event, "h", widget, onResize)}
       />
-      {resizing ? <span className={styles.resizeHint}>{resizing === "w" ? "Largeur" : "Hauteur"}</span> : null}
     </article>
   );
+}
+
+function beginResize(
+  event: React.PointerEvent,
+  axis: "w" | "h",
+  widget: IosWidget,
+  onResize: (w: number, h: number) => void
+) {
+  event.stopPropagation();
+  const grid = (event.currentTarget.closest(`.${styles.grid}`) as HTMLElement | null);
+  if (!grid) return;
+  const onMovePtr = (ev: PointerEvent) => {
+    const rect = grid.getBoundingClientRect();
+    if (axis === "w") {
+      const colW = rect.width / columnCount(grid);
+      onResize(Math.max(1, Math.round((ev.clientX - rect.left) / colW) - widget.x), widget.h);
+    } else {
+      const rowH = rect.height / rowsFrom(grid);
+      onResize(widget.w, Math.max(1, Math.round((ev.clientY - rect.top) / rowH) - widget.y));
+    }
+  };
+  const onUp = () => {
+    window.removeEventListener("pointermove", onMovePtr);
+    window.removeEventListener("pointerup", onUp);
+  };
+  window.addEventListener("pointermove", onMovePtr);
+  window.addEventListener("pointerup", onUp);
 }
 
 function Inspector({
@@ -487,15 +562,15 @@ function Inspector({
     <div className={styles.inspectorBody}>
       <p className={styles.inspectTitle}>{item?.title}</p>
       <div className={styles.rankRow}>
-        <button type="button" className={styles.ghost} onClick={() => onNudge(-1)}>
-          Monter
+        <button type="button" className={styles.rankBtn} onClick={() => onNudge(-1)}>
+          Plus haut
         </button>
-        <button type="button" className={styles.ghost} onClick={() => onNudge(1)}>
-          Descendre
+        <button type="button" className={styles.rankBtn} onClick={() => onNudge(1)}>
+          Plus bas
         </button>
       </div>
       <label className={styles.field}>
-        Intitulé dans l’app
+        Nom sur l’écran
         <input
           className={styles.input}
           value={widget.title}
@@ -509,10 +584,10 @@ function Inspector({
           checked={widget.visible}
           onChange={(event) => onChange({ visible: event.target.checked })}
         />
-        Visible sur l’appareil
+        Montrer cette carte
       </label>
       <label className={styles.field}>
-        Largeur ({widget.w} / {columns})
+        Largeur
         <input
           type="range"
           min={1}
@@ -522,7 +597,7 @@ function Inspector({
         />
       </label>
       <label className={styles.field}>
-        Hauteur ({widget.h})
+        Hauteur
         <input
           type="range"
           min={1}
@@ -532,7 +607,7 @@ function Inspector({
         />
       </label>
       <button type="button" className={styles.danger} onClick={onRemove}>
-        Retirer de l’écran
+        Enlever cette carte
       </button>
     </div>
   );
@@ -556,9 +631,11 @@ function cellFromPoint(
 }
 
 function columnCount(grid: Element): number {
-  return getComputedStyle(grid).gridTemplateColumns.split(" ").filter(Boolean).length;
+  const cols = Number.parseInt(getComputedStyle(grid).getPropertyValue("--cols") || "4", 10);
+  return Number.isFinite(cols) && cols > 0 ? cols : 4;
 }
 
 function rowsFrom(grid: Element): number {
-  return getComputedStyle(grid).gridTemplateRows.split(" ").filter(Boolean).length;
+  const rows = Number.parseInt(getComputedStyle(grid).getPropertyValue("--rows") || "8", 10);
+  return Number.isFinite(rows) && rows > 0 ? rows : 8;
 }
