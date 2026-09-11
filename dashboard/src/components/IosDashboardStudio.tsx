@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   addWidget,
   catalogItem,
   defaultLayout,
   gridRowCount,
-  moveWidget,
+  nudgeRank,
+  occupies,
   remapLayout,
+  relocateWidget,
   removeWidget,
   resizeWidget,
   updateWidget,
@@ -26,30 +28,106 @@ type StudioProps = {
   setLayout: ReturnType<typeof useIosDashboardLayout>["setLayout"];
 };
 
-type DragState = {
+type DragSession = {
   id: string;
   fromPalette?: IosWidgetType;
-  offsetX: number;
-  offsetY: number;
+  grabCol: number;
+  grabRow: number;
+  originX: number;
+  originY: number;
+  pointerX: number;
+  pointerY: number;
 };
 
 export function IosDashboardStudio({ layouts, saveState, error, setLayout }: StudioProps) {
   const [device, setDevice] = useState<IosDeviceKind>("ipad");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [drag, setDrag] = useState<DragState | null>(null);
-  const [hoverCell, setHoverCell] = useState<{ x: number; y: number } | null>(null);
+  const [drag, setDrag] = useState<DragSession | null>(null);
+  const [dropCell, setDropCell] = useState<{ x: number; y: number } | null>(null);
+  const gridRef = useRef<HTMLDivElement | null>(null);
 
   const layout = layouts[device];
+  const layoutRef = useRef(layout);
+  layoutRef.current = layout;
+  const dragRef = useRef<DragSession | null>(null);
   const selected = layout.widgets.find((widget) => widget.id === selectedId) ?? null;
   const rows = gridRowCount(layout, device === "iphone" ? 12 : 8);
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
   const usedTypes = new Set(layout.widgets.map((widget) => widget.type));
   const palette = WIDGET_CATALOG.filter((item) => !usedTypes.has(item.type));
+  const swapTarget = dropCell
+    ? layout.widgets.find(
+        (widget) => widget.id !== drag?.id && occupies(widget, dropCell.x, dropCell.y)
+      )
+    : undefined;
 
   useEffect(() => {
     if (selected && !layout.widgets.some((widget) => widget.id === selected.id)) {
       setSelectedId(null);
     }
   }, [layout.widgets, selected]);
+
+  useEffect(() => {
+    const onMove = (event: PointerEvent) => {
+      const session = dragRef.current;
+      if (!session) return;
+      const next = { ...session, pointerX: event.clientX, pointerY: event.clientY };
+      dragRef.current = next;
+      setDrag(next);
+      const currentLayout = layoutRef.current;
+      const cell = cellFromPoint(
+        gridRef.current,
+        event.clientX,
+        event.clientY,
+        currentLayout.columns,
+        rowsRef.current
+      );
+      if (!cell) return;
+      setDropCell({
+        x: Math.max(0, cell.x - session.grabCol),
+        y: Math.max(0, cell.y - session.grabRow),
+      });
+    };
+    const onUp = (event: PointerEvent) => {
+      const session = dragRef.current;
+      if (!session) return;
+      const currentLayout = layoutRef.current;
+      const cell = cellFromPoint(
+        gridRef.current,
+        event.clientX,
+        event.clientY,
+        currentLayout.columns,
+        rowsRef.current
+      );
+      dragRef.current = null;
+      setDrag(null);
+      setDropCell(null);
+      if (!cell) return;
+      if (Math.hypot(event.clientX - session.originX, event.clientY - session.originY) < 12) return;
+      const x = Math.max(0, cell.x - session.grabCol);
+      const y = Math.max(0, cell.y - session.grabRow);
+      if (session.fromPalette) {
+        const withWidget = addWidget(currentLayout, session.fromPalette);
+        const added = withWidget.widgets.find((widget) => widget.type === session.fromPalette);
+        setLayout(device, added ? relocateWidget(withWidget, added.id, x, y) : withWidget);
+        setSelectedId(session.fromPalette);
+        return;
+      }
+      const current = currentLayout.widgets.find((widget) => widget.id === session.id);
+      if (current && current.x === x && current.y === y) return;
+      setLayout(device, relocateWidget(currentLayout, session.id, x, y));
+      setSelectedId(session.id);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
+  }, [device, setLayout]);
 
   const saveLabel =
     saveState === "saving"
@@ -64,35 +142,44 @@ export function IosDashboardStudio({ layouts, saveState, error, setLayout }: Stu
     setLayout(device, next);
   }
 
-  function onCellPointerMove(event: React.PointerEvent<HTMLDivElement>) {
-    if (!drag) return;
-    const grid = event.currentTarget;
-    const rect = grid.getBoundingClientRect();
-    const colW = rect.width / layout.columns;
-    const rowH = rect.height / rows;
-    const x = Math.max(0, Math.min(layout.columns - 1, Math.floor((event.clientX - rect.left) / colW)));
-    const y = Math.max(0, Math.min(rows - 1, Math.floor((event.clientY - rect.top) / rowH)));
-    setHoverCell({ x, y });
+  function startTileDrag(event: React.PointerEvent, widget: IosWidget) {
+    if ((event.target as HTMLElement).dataset.handle) return;
+    event.preventDefault();
+    setSelectedId(widget.id);
+    const cell = cellFromPoint(gridRef.current, event.clientX, event.clientY, layout.columns, rows);
+    const session: DragSession = {
+      id: widget.id,
+      grabCol: cell ? Math.max(0, cell.x - widget.x) : 0,
+      grabRow: cell ? Math.max(0, cell.y - widget.y) : 0,
+      originX: event.clientX,
+      originY: event.clientY,
+      pointerX: event.clientX,
+      pointerY: event.clientY,
+    };
+    dragRef.current = session;
+    setDrag(session);
+    setDropCell({ x: widget.x, y: widget.y });
   }
 
-  function onGridPointerUp() {
-    if (!drag || !hoverCell) {
-      setDrag(null);
-      setHoverCell(null);
-      return;
-    }
-    if (drag.fromPalette) {
-      const withWidget = addWidget(layout, drag.fromPalette);
-      const added = withWidget.widgets.find((widget) => widget.type === drag.fromPalette);
-      commit(added ? moveWidget(withWidget, added.id, hoverCell.x, hoverCell.y) : withWidget);
-      setSelectedId(drag.fromPalette);
-    } else {
-      commit(moveWidget(layout, drag.id, hoverCell.x, hoverCell.y));
-      setSelectedId(drag.id);
-    }
-    setDrag(null);
-    setHoverCell(null);
+  function startPaletteDrag(event: React.PointerEvent, type: IosWidgetType) {
+    const session: DragSession = {
+      id: type,
+      fromPalette: type,
+      grabCol: 0,
+      grabRow: 0,
+      originX: event.clientX,
+      originY: event.clientY,
+      pointerX: event.clientX,
+      pointerY: event.clientY,
+    };
+    dragRef.current = session;
+    setDrag(session);
+    setDropCell(null);
   }
+
+  const ghostItem = drag
+    ? catalogItem(drag.fromPalette ?? layout.widgets.find((widget) => widget.id === drag.id)?.type ?? "metrics")
+    : null;
 
   return (
     <section className={styles.studio} aria-labelledby="ios-studio-title">
@@ -103,8 +190,8 @@ export function IosDashboardStudio({ layouts, saveState, error, setLayout }: Stu
             Composer l’écran d’accueil
           </h2>
           <p className={styles.lead}>
-            Glissez les modules, étirez-les, choisissez iPhone ou iPad. L’équipe verra la même
-            composition dans l’app, en direct.
+            Attrapez un module et déposez-le sur un autre pour échanger leur rang, ou sur une case
+            libre pour le déplacer. L’app iPhone et iPad suit en direct.
           </p>
         </div>
         <div className={styles.heroMeta}>
@@ -137,7 +224,7 @@ export function IosDashboardStudio({ layouts, saveState, error, setLayout }: Stu
       <div className={styles.workspace}>
         <aside className={styles.palette}>
           <p className={styles.asideLabel}>Modules</p>
-          <p className={styles.asideHint}>Glissez un module sur la grille, ou cliquez pour l’ajouter.</p>
+          <p className={styles.asideHint}>Glissez un module sur l’écran, ou cliquez pour l’ajouter.</p>
           <ul className={styles.paletteList}>
             {palette.length === 0 ? (
               <li className={styles.emptyPalette}>Tous les modules sont déjà sur l’écran.</li>
@@ -148,13 +235,9 @@ export function IosDashboardStudio({ layouts, saveState, error, setLayout }: Stu
                     type="button"
                     className={styles.paletteCard}
                     style={{ ["--accent" as string]: item.accent }}
-                    draggable
-                    onDragStart={(event) => {
-                      event.dataTransfer.setData("text/plain", item.type);
-                      event.dataTransfer.effectAllowed = "copy";
-                      setDrag({ id: item.type, fromPalette: item.type, offsetX: 0, offsetY: 0 });
-                    }}
+                    onPointerDown={(event) => startPaletteDrag(event, item.type)}
                     onClick={() => {
+                      if (dragRef.current) return;
                       const next = addWidget(layout, item.type);
                       commit(next);
                       setSelectedId(item.type);
@@ -199,47 +282,17 @@ export function IosDashboardStudio({ layouts, saveState, error, setLayout }: Stu
           <div className={styles.bezel} data-device={device}>
             <div className={styles.notch} aria-hidden="true" />
             <div
-              className={styles.grid}
+              ref={gridRef}
+              className={`${styles.grid} ${drag ? styles.gridDragging : ""}`}
               style={{
                 gridTemplateColumns: `repeat(${layout.columns}, 1fr)`,
                 gridTemplateRows: `repeat(${rows}, minmax(52px, 1fr))`,
-              }}
-              onPointerMove={onCellPointerMove}
-              onPointerUp={onGridPointerUp}
-              onPointerLeave={() => {
-                if (!drag) setHoverCell(null);
-              }}
-              onDragOver={(event) => {
-                event.preventDefault();
-                const rect = event.currentTarget.getBoundingClientRect();
-                const colW = rect.width / layout.columns;
-                const rowH = rect.height / rows;
-                setHoverCell({
-                  x: Math.max(0, Math.min(layout.columns - 1, Math.floor((event.clientX - rect.left) / colW))),
-                  y: Math.max(0, Math.min(rows - 1, Math.floor((event.clientY - rect.top) / rowH))),
-                });
-              }}
-              onDrop={(event) => {
-                event.preventDefault();
-                const type = event.dataTransfer.getData("text/plain") as IosWidgetType;
-                if (!type) return;
-                const rect = event.currentTarget.getBoundingClientRect();
-                const colW = rect.width / layout.columns;
-                const rowH = rect.height / rows;
-                const x = Math.max(0, Math.min(layout.columns - 1, Math.floor((event.clientX - rect.left) / colW)));
-                const y = Math.max(0, Math.min(rows - 1, Math.floor((event.clientY - rect.top) / rowH)));
-                const withWidget = addWidget(layout, type);
-                const added = withWidget.widgets.find((widget) => widget.type === type);
-                commit(added ? moveWidget(withWidget, added.id, x, y) : withWidget);
-                setSelectedId(type);
-                setDrag(null);
-                setHoverCell(null);
               }}
             >
               {Array.from({ length: layout.columns * rows }, (_, index) => {
                 const x = index % layout.columns;
                 const y = Math.floor(index / layout.columns);
-                const hot = hoverCell?.x === x && hoverCell?.y === y;
+                const hot = dropCell?.x === x && dropCell?.y === y && !swapTarget;
                 return <span key={`${x}-${y}`} className={hot ? styles.cellHot : styles.cell} />;
               })}
               {layout.widgets.map((widget) => (
@@ -247,8 +300,10 @@ export function IosDashboardStudio({ layouts, saveState, error, setLayout }: Stu
                   key={widget.id}
                   widget={widget}
                   selected={selected?.id === widget.id}
+                  dragging={drag?.id === widget.id}
+                  swapTarget={swapTarget?.id === widget.id}
                   onSelect={() => setSelectedId(widget.id)}
-                  onMove={(x, y) => commit(moveWidget(layout, widget.id, x, y))}
+                  onPointerDown={(event) => startTileDrag(event, widget)}
                   onResize={(w, h) => commit(resizeWidget(layout, widget.id, w, h))}
                 />
               ))}
@@ -263,6 +318,7 @@ export function IosDashboardStudio({ layouts, saveState, error, setLayout }: Stu
               widget={selected}
               columns={layout.columns}
               onChange={(patch) => commit(updateWidget(layout, selected.id, patch))}
+              onNudge={(dir) => commit(nudgeRank(layout, selected.id, dir))}
               onRemove={() => {
                 commit(removeWidget(layout, selected.id));
                 setSelectedId(null);
@@ -270,7 +326,8 @@ export function IosDashboardStudio({ layouts, saveState, error, setLayout }: Stu
             />
           ) : (
             <p className={styles.asideHint}>
-              Cliquez un module sur l’écran pour changer son titre, sa taille ou le retirer.
+              Glissez un module sur un autre pour inverser leur place. Cliquez-en un pour le
+              renommer, le redimensionner ou le retirer.
             </p>
           )}
           <ol className={styles.legend}>
@@ -294,6 +351,20 @@ export function IosDashboardStudio({ layouts, saveState, error, setLayout }: Stu
           </ol>
         </aside>
       </div>
+
+      {drag && ghostItem ? (
+        <div
+          className={styles.dragGhost}
+          style={{
+            left: drag.pointerX + 12,
+            top: drag.pointerY + 12,
+            ["--accent" as string]: ghostItem.accent,
+          }}
+        >
+          <strong>{ghostItem.title}</strong>
+          <span>{swapTarget ? "Relâcher pour échanger" : "Relâcher pour placer"}</span>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -301,14 +372,18 @@ export function IosDashboardStudio({ layouts, saveState, error, setLayout }: Stu
 function BoardTile({
   widget,
   selected,
+  dragging,
+  swapTarget,
   onSelect,
-  onMove,
+  onPointerDown,
   onResize,
 }: {
   widget: IosWidget;
   selected: boolean;
+  dragging: boolean;
+  swapTarget: boolean;
   onSelect: () => void;
-  onMove: (x: number, y: number) => void;
+  onPointerDown: (event: React.PointerEvent) => void;
   onResize: (w: number, h: number) => void;
 }) {
   const item = catalogItem(widget.type);
@@ -326,32 +401,16 @@ function BoardTile({
     [item?.accent, widget]
   );
 
+  const className = [
+    selected ? styles.tileOn : styles.tile,
+    dragging ? styles.tileDragging : "",
+    swapTarget ? styles.tileSwap : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <article
-      className={selected ? styles.tileOn : styles.tile}
-      style={style}
-      onPointerDown={(event) => {
-        if ((event.target as HTMLElement).dataset.handle) return;
-        onSelect();
-      }}
-      draggable
-      onDragStart={(event) => {
-        event.dataTransfer.setData("application/x-widget", widget.id);
-        event.dataTransfer.effectAllowed = "move";
-      }}
-      onDragEnd={(event) => {
-        const grid = (event.currentTarget.parentElement as HTMLElement | null);
-        if (!grid) return;
-        const rect = grid.getBoundingClientRect();
-        const columns = getComputedStyle(grid).gridTemplateColumns.split(" ").length;
-        const rows = getComputedStyle(grid).gridTemplateRows.split(" ").length;
-        const colW = rect.width / columns;
-        const rowH = rect.height / rows;
-        const x = Math.max(0, Math.min(columns - 1, Math.floor((event.clientX - rect.left) / colW)));
-        const y = Math.max(0, Math.min(rowsFrom(grid) - 1, Math.floor((event.clientY - rect.top) / rowH)));
-        onMove(x, y);
-      }}
-    >
+    <article className={className} style={style} onPointerDown={onPointerDown} onClick={onSelect}>
       <p className={styles.tileKicker}>{item?.blurb}</p>
       <h3>{title}</h3>
       {!widget.visible ? <p className={styles.hiddenTag}>Masqué dans l’app</p> : null}
@@ -414,17 +473,27 @@ function Inspector({
   widget,
   columns,
   onChange,
+  onNudge,
   onRemove,
 }: {
   widget: IosWidget;
   columns: number;
   onChange: (patch: Partial<Pick<IosWidget, "title" | "visible" | "w" | "h">>) => void;
+  onNudge: (direction: -1 | 1) => void;
   onRemove: () => void;
 }) {
   const item = catalogItem(widget.type);
   return (
     <div className={styles.inspectorBody}>
       <p className={styles.inspectTitle}>{item?.title}</p>
+      <div className={styles.rankRow}>
+        <button type="button" className={styles.ghost} onClick={() => onNudge(-1)}>
+          Monter
+        </button>
+        <button type="button" className={styles.ghost} onClick={() => onNudge(1)}>
+          Descendre
+        </button>
+      </div>
       <label className={styles.field}>
         Intitulé dans l’app
         <input
@@ -467,6 +536,23 @@ function Inspector({
       </button>
     </div>
   );
+}
+
+function cellFromPoint(
+  grid: HTMLElement | null,
+  clientX: number,
+  clientY: number,
+  columns: number,
+  rows: number
+): { x: number; y: number } | null {
+  if (!grid) return null;
+  const rect = grid.getBoundingClientRect();
+  if (clientX < rect.left - 24 || clientX > rect.right + 24 || clientY < rect.top - 24 || clientY > rect.bottom + 24) {
+    return null;
+  }
+  const x = Math.max(0, Math.min(columns - 1, Math.floor(((clientX - rect.left) / rect.width) * columns)));
+  const y = Math.max(0, Math.min(rows - 1, Math.floor(((clientY - rect.top) / rect.height) * rows)));
+  return { x, y };
 }
 
 function columnCount(grid: Element): number {

@@ -267,6 +267,12 @@
   border-color: var(--gold-soft);
 }
 
+.gridDragging {
+  cursor: grabbing;
+  user-select: none;
+  touch-action: none;
+}
+
 .tile,
 .tileOn {
   position: relative;
@@ -280,11 +286,54 @@
   color: var(--text);
   cursor: grab;
   overflow: hidden;
+  user-select: none;
+  touch-action: none;
 }
 
 .tileOn {
   outline: 2px solid color-mix(in srgb, var(--gold) 70%, white);
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+}
+
+.tileDragging {
+  opacity: 0.38;
+  cursor: grabbing;
+}
+
+.tileSwap {
+  outline: 2px dashed var(--gold);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--gold) 22%, transparent);
+}
+
+.dragGhost {
+  position: fixed;
+  z-index: 80;
+  pointer-events: none;
+  min-width: 160px;
+  padding: 0.65rem 0.8rem;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 28%, #111), #111);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+  transform: rotate(2deg);
+}
+
+.dragGhost strong {
+  display: block;
+  font-family: var(--serif);
+  font-size: 1.05rem;
+}
+
+.dragGhost span {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.72rem;
+  color: var(--gold-soft);
+}
+
+.rankRow {
+  display: flex;
+  gap: 0.45rem;
 }
 
 .tileKicker {

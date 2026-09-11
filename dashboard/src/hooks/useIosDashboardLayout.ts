@@ -8,6 +8,7 @@ import {
   defaultLayout,
   layoutToPayload,
   normalizeLayout,
+  sanitizeEditorLayout,
   type IosDashboardLayout,
   type IosDeviceKind,
 } from "../lib/iosDashboardLayout";
@@ -71,7 +72,7 @@ export function useIosDashboardLayout(organizationId: string | null) {
 
   const setLayout = useCallback(
     (device: IosDeviceKind, next: IosDashboardLayout, persist = true) => {
-      const normalized = normalizeLayout(next, device);
+      const normalized = sanitizeEditorLayout(next, device);
       if (device === "iphone") setIphone(cloneLayout(normalized));
       else setIpad(cloneLayout(normalized));
       if (!persist || !organizationId) return;

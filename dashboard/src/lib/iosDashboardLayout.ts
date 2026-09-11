@@ -196,6 +196,19 @@ export function cloneLayout(layout: IosDashboardLayout): IosDashboardLayout {
   };
 }
 
+export function sanitizeEditorLayout(
+  layout: IosDashboardLayout,
+  device: IosDeviceKind
+): IosDashboardLayout {
+  const columns = DEVICE_COLUMNS[device];
+  return {
+    id: device,
+    version: IOS_LAYOUT_VERSION,
+    columns,
+    widgets: layout.widgets.map((widget) => clampWidget(widget, columns)),
+  };
+}
+
 export function normalizeLayout(raw: unknown, device: IosDeviceKind): IosDashboardLayout {
   const fallback = defaultLayout(device);
   if (!raw || typeof raw !== "object") return fallback;
@@ -335,7 +348,22 @@ function pinWidget(layout: IosDashboardLayout, id: string, next: IosWidget): Ios
   };
 }
 
-export function moveWidget(
+export function swapPositions(layout: IosDashboardLayout, aId: string, bId: string): IosDashboardLayout {
+  const a = layout.widgets.find((widget) => widget.id === aId);
+  const b = layout.widgets.find((widget) => widget.id === bId);
+  if (!a || !b || a.id === b.id) return layout;
+  return {
+    ...layout,
+    widgets: layout.widgets.map((widget) => {
+      if (widget.id === a.id) return clampWidget({ ...widget, x: b.x, y: b.y }, layout.columns);
+      if (widget.id === b.id) return clampWidget({ ...widget, x: a.x, y: a.y }, layout.columns);
+      return widget;
+    }),
+  };
+}
+
+/** Place un module. Déposé sur un autre → échange de rang. Case vide → il s’y installe et pousse les chevauchements. */
+export function relocateWidget(
   layout: IosDashboardLayout,
   id: string,
   x: number,
@@ -343,7 +371,40 @@ export function moveWidget(
 ): IosDashboardLayout {
   const current = layout.widgets.find((widget) => widget.id === id);
   if (!current) return layout;
-  return pinWidget(layout, id, { ...current, x, y });
+  const next = clampWidget({ ...current, x, y }, layout.columns);
+  if (next.x === current.x && next.y === current.y) return layout;
+
+  const others = layout.widgets.filter((widget) => widget.id !== id);
+  const hit = others.find((widget) => occupies(widget, next.x, next.y));
+  if (hit) return swapPositions(layout, current.id, hit.id);
+
+  const overlapping = others.filter((widget) => layoutsOverlap(widget, next));
+  const shifted = others.map((widget) =>
+    overlapping.some((other) => other.id === widget.id)
+      ? { ...widget, y: next.y + next.h }
+      : widget
+  );
+  return {
+    ...layout,
+    widgets: [next, ...shifted].map((widget) => clampWidget(widget, layout.columns)),
+  };
+}
+
+export function nudgeRank(layout: IosDashboardLayout, id: string, direction: -1 | 1): IosDashboardLayout {
+  const ordered = [...layout.widgets].sort((a, b) => a.y - b.y || a.x - b.x);
+  const index = ordered.findIndex((widget) => widget.id === id);
+  const other = ordered[index + direction];
+  if (index < 0 || !other) return layout;
+  return swapPositions(layout, id, other.id);
+}
+
+export function moveWidget(
+  layout: IosDashboardLayout,
+  id: string,
+  x: number,
+  y: number
+): IosDashboardLayout {
+  return relocateWidget(layout, id, x, y);
 }
 
 export function resizeWidget(
@@ -364,7 +425,16 @@ export function updateWidget(
 ): IosDashboardLayout {
   const current = layout.widgets.find((widget) => widget.id === id);
   if (!current) return layout;
-  return pinWidget(layout, id, { ...current, ...patch });
+  if (patch.x !== undefined || patch.y !== undefined) {
+    return relocateWidget(layout, id, patch.x ?? current.x, patch.y ?? current.y);
+  }
+  if (patch.w !== undefined || patch.h !== undefined) {
+    return pinWidget(layout, id, { ...current, ...patch });
+  }
+  return {
+    ...layout,
+    widgets: layout.widgets.map((widget) => (widget.id === id ? { ...widget, ...patch } : widget)),
+  };
 }
 
 export function removeWidget(layout: IosDashboardLayout, id: string): IosDashboardLayout {
