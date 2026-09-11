@@ -354,32 +354,45 @@ export function IosDashboardStudio({ layouts, saveState, error, setLayout }: Stu
         </aside>
 
         <div className={`${styles.stage} ${device === "iphone" ? styles.stagePhone : styles.stagePad}`}>
-          <div className={styles.bezel} data-device={device}>
-            <div className={styles.notch} aria-hidden="true" />
-            <p className={drag ? styles.coachLive : styles.coach}>{coach}</p>
-            <div
-              ref={gridRef}
-              className={`${styles.grid} ${drag ? styles.gridDragging : ""}`}
-              style={{ ["--cols" as string]: String(preview.columns), ["--rows" as string]: String(rows) }}
-            >
-              {preview.widgets.map((widget) => (
-                <BoardTile
-                  key={widget.id}
-                  widget={widget}
-                  columns={preview.columns}
-                  rows={rows}
-                  rank={ordered.findIndex((item) => item.id === widget.id) + 1}
-                  selected={selected?.id === widget.id}
-                  dragging={drag?.id === widget.id || drag?.fromPalette === widget.type}
-                  swapTarget={swapTarget?.id === widget.id}
-                  onSelect={() => setSelectedId(widget.id)}
-                  onPointerDown={(event) => {
-                    const source = layout.widgets.find((item) => item.id === widget.id);
-                    if (source) startTileDrag(event, source);
-                  }}
-                  onResize={(w, h) => commit(resizeWidget(layout, widget.id, w, h))}
-                />
-              ))}
+          <p className={drag ? styles.coachLive : styles.coach}>{coach}</p>
+          <div className={styles.deviceFrame}>
+            <div className={styles.bezel} data-device={device}>
+              <span className={styles.camera} aria-hidden="true" />
+              <div className={styles.screen}>
+                <div className={styles.statusBar} aria-hidden="true">
+                  <span>9:41</span>
+                  <span className={styles.statusPips}>
+                    <i />
+                    <i />
+                    <i />
+                  </span>
+                </div>
+                <div
+                  ref={gridRef}
+                  className={`${styles.grid} ${drag ? styles.gridDragging : ""}`}
+                  style={{ ["--cols" as string]: String(preview.columns), ["--rows" as string]: String(rows) }}
+                >
+                  {preview.widgets.map((widget) => (
+                    <BoardTile
+                      key={widget.id}
+                      widget={widget}
+                      columns={preview.columns}
+                      rows={rows}
+                      rank={ordered.findIndex((item) => item.id === widget.id) + 1}
+                      selected={selected?.id === widget.id}
+                      dragging={drag?.id === widget.id || drag?.fromPalette === widget.type}
+                      swapTarget={swapTarget?.id === widget.id}
+                      onSelect={() => setSelectedId(widget.id)}
+                      onPointerDown={(event) => {
+                        const source = layout.widgets.find((item) => item.id === widget.id);
+                        if (source) startTileDrag(event, source);
+                      }}
+                      onResize={(w, h) => commit(resizeWidget(layout, widget.id, w, h))}
+                    />
+                  ))}
+                </div>
+                <span className={styles.homeBar} aria-hidden="true" />
+              </div>
             </div>
           </div>
         </div>
@@ -495,10 +508,13 @@ function BoardTile({
 
   return (
     <article className={className} style={style} onPointerDown={onPointerDown} onClick={onSelect}>
-      <span className={styles.rankBadge}>{rank}</span>
-      <p className={styles.tileKicker}>{item?.blurb}</p>
-      <h3>{title}</h3>
-      {!widget.visible ? <p className={styles.hiddenTag}>Cachée sur le téléphone</p> : null}
+      <div className={styles.face}>
+        <span className={styles.rankBadge}>{rank}</span>
+        <span className={styles.glyph} aria-hidden="true" />
+        <p className={styles.tileKicker}>{item?.blurb}</p>
+        <h3>{title}</h3>
+        {!widget.visible ? <p className={styles.hiddenTag}>Cachée sur le téléphone</p> : null}
+      </div>
       <button
         type="button"
         className={styles.handleE}
