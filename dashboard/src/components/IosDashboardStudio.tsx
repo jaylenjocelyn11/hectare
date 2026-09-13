@@ -358,13 +358,23 @@ export function IosDashboardStudio({ layouts, saveState, error, setLayout, live 
         <div className={`${styles.stage} ${device === "iphone" ? styles.stagePhone : styles.stagePad}`}>
           <p className={drag ? styles.coachLive : styles.coach}>{coach}</p>
           <div className={styles.deviceFrame}>
-            <div className={styles.canvas} data-device={device}>
-              <div
-                ref={gridRef}
-                className={`${styles.grid} ${drag ? styles.gridDragging : ""}`}
-                style={{ ["--cols" as string]: String(preview.columns), ["--rows" as string]: String(rows) }}
-              >
-                {preview.widgets.map((widget) => (
+            <div className={styles.bezel} data-device={device}>
+              <span className={styles.camera} aria-hidden="true" />
+              <div className={styles.screen}>
+                <div className={styles.statusBar} aria-hidden="true">
+                  <span>9:41</span>
+                  <span className={styles.statusPips}>
+                    <i />
+                    <i />
+                    <i />
+                  </span>
+                </div>
+                <div
+                  ref={gridRef}
+                  className={`${styles.grid} ${drag ? styles.gridDragging : ""}`}
+                  style={{ ["--cols" as string]: String(preview.columns), ["--rows" as string]: String(rows) }}
+                >
+                  {preview.widgets.map((widget) => (
                     <BoardTile
                       key={widget.id}
                       widget={widget}
@@ -375,13 +385,15 @@ export function IosDashboardStudio({ layouts, saveState, error, setLayout, live 
                       swapTarget={swapTarget?.id === widget.id}
                       live={live}
                       onSelect={() => setSelectedId(widget.id)}
-                    onPointerDown={(event) => {
-                      const source = layout.widgets.find((item) => item.id === widget.id);
-                      if (source) startTileDrag(event, source);
-                    }}
-                    onResize={(w, h) => commit(resizeWidget(layout, widget.id, w, h))}
-                  />
-                ))}
+                      onPointerDown={(event) => {
+                        const source = layout.widgets.find((item) => item.id === widget.id);
+                        if (source) startTileDrag(event, source);
+                      }}
+                      onResize={(w, h) => commit(resizeWidget(layout, widget.id, w, h))}
+                    />
+                  ))}
+                </div>
+                <span className={styles.homeBar} aria-hidden="true" />
               </div>
             </div>
           </div>
