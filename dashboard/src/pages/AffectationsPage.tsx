@@ -118,7 +118,7 @@ export function AffectationsPage() {
       .split("\n")
       .map((line) => line.trim())
       .filter(Boolean)
-      .map((title) => ({ id: newTaskId(), title, isCompleted: false, completedAt: null }));
+      .map((title) => ({ id: newTaskId(), title, isCompleted: false }));
     if (!title || tasks.length === 0) {
       manage.setError("Indique un nom et au moins une tâche (une par ligne).");
       return;
@@ -156,7 +156,6 @@ export function AffectationsPage() {
         id: newTaskId(),
         title: task.title,
         isCompleted: false,
-        completedAt: null,
       }));
       for (const user of chosenUsers) {
         await createOrgDoc(organizationId, "affectationAssignments", {
